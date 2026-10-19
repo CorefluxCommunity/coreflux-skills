@@ -547,9 +547,9 @@ CALL AGENT "MyAgent.execute"
 
 ### TRIGGER — trigger a route event
 ```
-TRIGGER "MyDB" WITH "sensor1" FOR "ReadSensors"
+TRIGGER "MyDB" TO "sensor1" FOR "ReadSensors"
 ```
-Order: route name, WITH the data to send, FOR the route event/mapping name.
+Order: connector name, TO the data to send, FOR the route event/mapping name. `WITH` is accepted in place of `TO`, but the data still comes before `FOR`. Writing the event name first and the data after `FOR` still parses, but sends the event name as the data to an event named after the data.
 
 ## PUBLISH MODEL — publish a model instance
 ```
