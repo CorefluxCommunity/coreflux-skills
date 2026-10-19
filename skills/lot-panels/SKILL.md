@@ -1,6 +1,6 @@
 ---
 name: lot-panels
-description: How to write LoTV panel definitions: DEFINE PANEL, ADD COMPONENT, BIND, ON events, WITH VISIBILITY, WITH INTERACT, and the mandatory workflow for deploying panels via broker.add_panel.
+description: "How to write LoTV panel definitions: DEFINE PANEL, ADD COMPONENT, BIND, ON events, WITH VISIBILITY, WITH INTERACT, and the mandatory workflow for deploying panels via broker.add_panel."
 ---
 
 # LoTV Panel Authoring — Coreflux Visual Language
