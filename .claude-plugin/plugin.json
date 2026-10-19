@@ -1,0 +1,7 @@
+{
+  "name": "coreflux",
+  "description": "Agent skills for the Coreflux MQTT broker: writing LoT (Language of Things) actions, models, routes, rules, agents, things, panels and themes, Python scripts, and using the broker's MCP tools.",
+  "author": { "name": "Coreflux", "url": "https://coreflux.org" },
+  "homepage": "https://github.com/CorefluxCommunity/coreflux-skills",
+  "license": "MIT"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "coreflux",
+  "owner": { "name": "Coreflux", "url": "https://coreflux.org" },
+  "plugins": [
+    {
+      "name": "coreflux",
+      "source": "./",
+      "description": "Agent skills for writing LoT and operating the Coreflux MQTT broker."
+    }
+  ]
+}
