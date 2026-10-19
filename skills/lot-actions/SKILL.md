@@ -528,8 +528,8 @@ CALL MCP "MyMcpRoute.search"
 
 To find the tool names and their parameters, read the retained topics the MCP connector publishes once
 it connects: `$SYS/Coreflux/Routes/<Route>/Tools` (summary with the `tools` list) and
-`$SYS/Coreflux/Routes/<Route>/Tools/<tool>` (description and `parameters`). Ignore the
-`usage_example` field there: it is a one-line call without the connector name, which the parser rejects.
+`$SYS/Coreflux/Routes/<Route>/Tools/<tool>` (description and `parameters`). Its `usage_example` and
+`trigger_example` fields are ready to paste.
 
 ### CALL LLM — invoke an LLM route
 ```

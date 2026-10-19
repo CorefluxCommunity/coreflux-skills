@@ -67,7 +67,7 @@ A failure with a stable code (`ROUTE_INIT_FAILED`, `ROUTE_ACTION_LIMIT_EXCEEDED`
 | `Unknown command: -x` | Not a registered token — a typo |
 | `Permission denied: You are not allowed to execute …` | Your user fails `CommandCall` or the command's own scope (section 6) |
 | `Command blocked: …` | The payload matched the broker's command-injection filter |
-| **No reply at all** | (a) the publish to `$SYS/Coreflux/Command` was dropped — `PublishSys` is default-deny and your user holds none of the three flags; (b) you may not subscribe to `Command/Output`, so the reply exists but you never see it; (c) the command has no MQTT reply: `-updateData`, and today `-checkActionUsage`, `-loadFolder` and `-mqttPacketTrace` (they parse but do nothing over MQTT — use their MCP tools) |
+| **No reply at all** | (a) the publish to `$SYS/Coreflux/Command` was dropped — `PublishSys` is default-deny and your user holds none of the three flags; (b) you may not subscribe to `Command/Output`, so the reply exists but you never see it; (c) the command has no MQTT reply: `-updateData` |
 
 ## 3. `-runAction`
 
@@ -261,8 +261,9 @@ listing every `GET ENV` / `GET SECRET` name the operator must set.
 
 - Wrap the command in JSON, or quote a LoT body.
 - Send `-requestUser`, or put `-requestId` anywhere but last.
-- Expect a reply from `-updateData`, or from `-checkActionUsage` / `-loadFolder` /
-  `-mqttPacketTrace` over MQTT.
+- Expect a reply from `-updateData`.
+- Send `-loadFolder` over MQTT: it is refused there, because it would read any folder on the broker
+  host. Use `-addProject` / `-loadProject`, or `--project` at startup.
 - Read `License/Status` or `Stats` — use `License`; there is no live `Stats` topic.
 - Wait for `Projects/<n>/download` after sending `-getProject` — it is not retained.
 - Treat `-runAction` with a topic envelope as a dry run.

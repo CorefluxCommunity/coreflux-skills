@@ -267,8 +267,8 @@ Read value publishes on **factory/plc1/control/setpoint**; publishing to **facto
 
 Value options on an OT **ADD TAG** (all optional): **SCALING** and **OFFSET** give `raw × SCALING + OFFSET`;
 **MIN_VALUE** / **MAX_VALUE** clamp it; **DECIMAL_PLACES** rounds it (default 2); **DEADBAND** is the minimum
-change before a new value is published (default 0 = every poll); **UNIT** is a label. These take a plain number:
-a leading minus (`WITH OFFSET -40`) is a parse error, even though the template's hint allows one.
+change before a new value is published (default 0 = every poll); **UNIT** is a label. These take a plain number;
+OFFSET, MIN_VALUE and MAX_VALUE may be negative (`WITH OFFSET -40`).
 
 ## Database Connector Examples
 
@@ -341,7 +341,6 @@ addresses (`400001`, `300001`, `100001`) are converted; `"40001"` is register of
 ```
 DEFINE ROUTE BoilerRtu WITH TYPE MODBUS_SERIAL
     ADD MODBUS_CONFIG
-        WITH CONNECTION_TYPE "SERIAL"
         WITH COM_PORT "/dev/ttyUSB0"
         WITH BAUD_RATE 19200
         WITH PARITY "EVEN"
@@ -358,9 +357,8 @@ DEFINE ROUTE BoilerRtu WITH TYPE MODBUS_SERIAL
             WITH SCALING 0.1
             WITH DEADBAND 0.5
 ```
-The serial port is **COM_PORT** (`COM3` on Windows, `/dev/ttyUSB0` on Linux), not PORT. **CONNECTION_TYPE "SERIAL"**
-is required even on MODBUS_SERIAL: the transport is read from CONNECTION_TYPE (default TCP), so without it the
-connector asks for an IP. BAUD_RATE must be at least 300; PARITY is NONE/ODD/EVEN/MARK/SPACE; DATA_BITS 7 or 8;
+The serial port is **COM_PORT** (`COM3` on Windows, `/dev/ttyUSB0` on Linux), not PORT. MODBUS_SERIAL is serial
+by its type, so CONNECTION_TYPE is not needed. BAUD_RATE must be at least 300; PARITY is NONE/ODD/EVEN/MARK/SPACE; DATA_BITS 7 or 8;
 STOP_BITS ONE/TWO/ONEPOINTFIVE; SLAVE_ID 1–247 on a serial line.
 
 ### BACnet/IP
@@ -437,7 +435,6 @@ Logix tag name. IP is required; PORT defaults to 44818.
 ```
 DEFINE ROUTE Press1 WITH TYPE ADS
     ADD ADS_CONFIG
-        WITH LOCAL_NET_ID "192.168.1.10.1.1"
         WITH TARGET_NET_ID "192.168.1.50.1.1"
         WITH TARGET_IP "192.168.1.50"
         WITH TARGET_PORT 851
@@ -450,7 +447,9 @@ DEFINE ROUTE Press1 WITH TYPE ADS
             WITH DATA_TYPE "REAL"
 ```
 The target is addressed by its AMS Net ID (**TARGET_NET_ID**) and **TARGET_PORT** (851 for TwinCAT 3, 801 for
-TwinCAT 2); there is no AMS_NET_ID key. A SYMBOL tag's ADDRESS is the PLC symbol path; ADDRESS_TYPE "INDEX"
+TwinCAT 2); there is no AMS_NET_ID key. The connector goes through the local AMS router and does not create AMS
+routes, so set up the route between this host and the PLC yourself. LOCAL_NET_ID, LOCAL_ROUTE_TO_TARGET,
+TARGET_ROUTE_TO_LOCAL, TARGET_USER and TARGET_PASSWORD are accepted but not used. A SYMBOL tag's ADDRESS is the PLC symbol path; ADDRESS_TYPE "INDEX"
 takes `"indexGroup,indexOffset"`.
 
 ### Omron FINS
@@ -678,7 +677,7 @@ SQLSERVER/MSSQL, MONGODB, CRATEDB, SNOWFLAKE, OPENSEARCH, FILE_STORAGE and REST_
 - **WRONG:** DEFINE MODEL (or broker.add_model) for a new Modbus/OPC/S7/device point **RIGHT:** **ADD TAG** inside **ADD MAPPING** on the OT connector; deploy full connector with **broker.add_route**
 - **WRONG:** Using **DESTINATION_TOPIC** on an OT **ADD MAPPING** as the topic where polled tag data appears **RIGHT:** Data is on **SOURCE_TOPIC** / **`<SOURCE_TOPIC>/<tagName>`** (subscribe or read those topics)
 - **WRONG:** **ADD TAG** directly under **DEFINE ROUTE** **RIGHT:** every **ADD TAG** sits inside an **ADD MAPPING** (otherwise: "Unexpected token TAG in route components")
-- **WRONG:** MODBUS_SERIAL with **WITH PORT "COM3"** and no CONNECTION_TYPE **RIGHT:** **WITH CONNECTION_TYPE "SERIAL"** + **WITH COM_PORT "COM3"**
+- **WRONG:** MODBUS_SERIAL with **WITH PORT "COM3"** **RIGHT:** **WITH COM_PORT "COM3"**
 - **NEVER use ADD METADATA in connector definitions.** `ADD METADATA` blocks (WITH IMAGE, WITH DESCRIPTION, WITH DOCLINK) appear in connector *templates* returned by `broker.get_route_template` for documentation purposes only. The LOT parser does **not** support `ADD METADATA` in deployed connectors. Including it in a `DEFINE ROUTE` block will cause a parse error. Always strip `ADD METADATA` and everything under it when generating connector LoT from a template.
 - Missing WITH TYPE after the connector name
 - Config block type must match the connector type (e.g., SQL_CONFIG for POSTGRESQL)
