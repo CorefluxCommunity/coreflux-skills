@@ -6,18 +6,20 @@ GitHub Copilot, Gemini CLI and others — to write **LoT (Language of Things)** 
 
 | Skill | Use it for |
 |-------|------------|
+| `broker-operations` | Operating a broker over MQTT: commands and replies, `$SYS` topics, triage, users and permissions, projects |
+| `broker-tools` | The broker's MCP tools and the safe validate → deploy workflow |
 | `lot-actions` | Actions: triggers, variables, topic operations, control flow, Python/LLM calls |
+| `lot-agents` | `DEFINE AGENT`: LLM connectors, tool grants, delegation |
 | `lot-models` | Models: data schemas, field types, topic bindings, storage, inheritance |
+| `lot-panels` | LoTV panels: components, bindings, events |
 | `lot-routes` | Connectors: databases, OT (Modbus, S7, OPC UA, …), REST, MQTT bridges, AI |
 | `lot-rules` | Permission rules: ALLOW/DENY, topic patterns, priorities |
-| `lot-agents` | `DEFINE AGENT`: LLM connectors, tool grants, delegation |
-| `lot-things` | `DEFINE THING`: templates, parameters, references |
-| `lot-panels` | LoTV panels: components, bindings, events |
 | `lot-themes` | LoTV themes: design tokens, light/dark modes, variants |
+| `lot-things` | `DEFINE THING`: templates, parameters, references |
 | `python-scripts` | Python scripts the broker runs, and `CALL PYTHON` |
-| `broker-tools` | The broker's MCP tools and the safe validate → deploy workflow |
 
-`skills.json` lists them, with the broker version they were exported from.
+`skills.json` lists them, with the broker version they were exported from (`brokerVersion`): the
+release tag for a tagged release, or `<latest tag>+<commit>` for a sync from the broker's main branch.
 
 ## Install
 
