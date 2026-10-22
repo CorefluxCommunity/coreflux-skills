@@ -589,7 +589,7 @@ DEFINE ROUTE LocalLLM WITH TYPE LLM
         WITH TEMPERATURE 0.7
 ```
 
-Cloud provider (PROVIDER `openai`, `anthropic`, or `compatible` for an OpenAI-compatible BASE_URL; default `ollama`):
+Cloud provider (PROVIDER `openai`, `anthropic`, `gemini`, or `compatible` for an OpenAI-compatible BASE_URL; default `ollama`):
 ```
 DEFINE ROUTE Claude WITH TYPE LLM
     ADD LLM_CONFIG
