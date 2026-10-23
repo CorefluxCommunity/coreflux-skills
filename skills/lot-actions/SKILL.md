@@ -407,7 +407,7 @@ There is no prefix NOT (`IF NOT {x} ...` is rejected) and no STARTS_WITH / ENDS_
 `MATCHES REGEX "^abc"` / `MATCHES REGEX "abc$"`. Do not compare a number with TRUE/FALSE
 (type mismatch at deploy).
 
-### ELSE IF — multi-way branch (there is no SWITCH statement in actions)
+### ELSE IF — multi-way branch
 ```
 IF {status} == "on" THEN
     PUBLISH TOPIC "led" WITH "1"
@@ -418,6 +418,20 @@ ELSE
 ```
 `ELIF` is accepted as a synonym for `ELSE IF`.
 
+### SWITCH — match one value against several (also SELECT)
+```
+SWITCH {status}
+    CASE "on" THEN
+        PUBLISH TOPIC "led" WITH "1"
+    CASE "off" THEN
+        PUBLISH TOPIC "led" WITH "0"
+    DEFAULT THEN
+        PUBLISH TOPIC "led" WITH "unknown"
+```
+The subject is read once and compared with `==` to each CASE in order; the first match runs and
+DEFAULT (optional, always last) runs when none does. Use `SWITCH PAYLOAD AS INT` to compare numbers.
+There is no fall-through and no `FOR EACH` (reserved, not supported yet).
+
 ### REPEAT … UNTIL — loop (also LOOP / ITERATE)
 ```
 SET "i" WITH 0
@@ -425,8 +439,8 @@ REPEAT
     SET "i" WITH {i} + 1
 UNTIL {i} >= 3
 ```
-
-
+The body runs before the condition is checked. A loop stops after 1000 iterations even if UNTIL
+never holds, so a wrong condition ends quietly at 1000 rather than hanging the action.
 
 ## String Transformations
 
@@ -461,6 +475,8 @@ FILTER or REPLACE; RESULT refers to the output of the previous step.
 ```
 SET "result" WITH {a} + {b} * 2
 ```
+Two integers divide as integers (`10 / 4` is `2`). Make an operand a decimal (`10.0 / 4`) or read it
+`AS DOUBLE` to keep the fraction; `10 / 4 AS DOUBLE` casts a result that is already `2`.
 
 ### String concatenation
 ```
@@ -727,7 +743,7 @@ RETURN
 | RETURN OUTPUT result | RETURN then OUTPUT result on separate lines | Single-line RETURN OUTPUT is rejected |
 | RETURN OUTPUT a, b, c | RETURN then one OUTPUT per line | Comma-separated outputs are rejected |
 | CALL PYTHON "S.f" WITH (x) RETURN AS {r} | WITH / RETURN AS on indented lines below | One-line CALL PYTHON/MCP/LLM/AGENT is rejected |
-| SWITCH {x} / CASE | IF … ELSE IF … ELSE | SWITCH is not an action statement |
+| SWITCH {x} / CASE "a" (no THEN) | CASE "a" THEN, block indented under it | Every CASE and DEFAULT needs THEN |
 | PAYLOAD AND_THEN TRIM | PAYLOAD TRIM, or FILTER … AND THEN TRIM | Chain keyword is AND THEN (two words) |
 | WITH { "k": {v} } | PUBLISH MODEL, or a dict from CALL PYTHON | No JSON object literal |
 | PAYLOAD inside ON EVERY / ON START / ON CONNECT | GET TOPIC "…" AS DOUBLE | Only ON TOPIC / ON CHANGE have a message |
