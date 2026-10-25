@@ -258,7 +258,7 @@ DEFINE MODEL SensorLog WITH TOPIC "sensors/log"
 
 ## Database Fetch (FETCH FROM)
 
-Accepted but not run yet (warning LOT4005, ENG-417): the model publishes without querying the route.
+Accepted but not run yet (warning LOT4005): the model publishes without querying the route.
 
 ```
     FETCH FROM "MyDB" WITH TABLE "sensors" WHEN id EQUALS "sensor1" LIMIT 10

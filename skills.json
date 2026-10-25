@@ -1,6 +1,5 @@
 {
-  "source": "CorefluxCommunity/coreflux-broker-evo",
-  "brokerVersion": "2.22.1-rc.211+5a144b5c",
+  "brokerVersion": "2.22.1-rc.210+e5db4d44",
   "skills": [
     {
       "name": "broker-operations",

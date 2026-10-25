@@ -96,7 +96,7 @@ reverse. Python scripts and themes are not clauses.
 - A dotted reference that does not resolve rejects the Thing.
 - Only these sites are rewritten: `CALL ACTION`, `CALL AGENT "<ref>.<method>"`, `CALL LLM` /
   `CALL MCP`, `PUBLISH|GET MODEL`, model `FROM`, `ADD MODEL`, `STORE IN`, `FETCH FROM`,
-  `TRIGGER "<event>" TO`, agent `USES LLM ROUTE|CONNECTOR`, `WITH AGENTS`, tool `WITH TARGET`, and
+  `TRIGGER "<connector>" TO <data> FOR <event>`, agent `USES LLM ROUTE|CONNECTOR`, `WITH AGENTS`, tool `WITH TARGET`, and
   in panels `INVOKE ACTION`, `TRIGGER ROUTE`, `NAVIGATE TO PANEL`, `BIND … TO MODEL|QUERY`.
 - Topic strings and payloads are never rewritten. To reach a sibling instance or go upward, use
   a reference param passed by the parent.
