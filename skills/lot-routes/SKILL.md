@@ -205,8 +205,8 @@ ADD EVENT ReadSensor
     WITH DESTINATION_TOPIC "sensors/{topic.2}/result"
     WITH QUERY "SELECT * FROM sensors WHERE id = '{payload.json.id}'"
 ```
-`{payload.json.id}` (with a payload like `{"id": "s1"}`) is used rather than `'{payload}'`, which is inserted
-unescaped; see the SQL injection note under PostgreSQL.
+Put a placeholder that carries text inside single quotes (`'{payload.json.id}'`, `'{payload}'`); on SQL
+connectors the value is escaped there. See the placeholder note under PostgreSQL.
 
 ### Query Placeholders
 | Placeholder | Value |
@@ -288,13 +288,27 @@ DEFINE ROUTE ProductionDB WITH TYPE POSTGRESQL
         WITH QUERY "SELECT * FROM orders WHERE status = '{payload.json.status}'"
     ADD EVENT InsertReading
         WITH SOURCE_TOPIC "sensors/store"
-        WITH QUERY "INSERT INTO readings (device, value, ts) VALUES ('{payload.json.device}', CAST('{payload.json.value}' AS DOUBLE PRECISION), NOW())"
+        WITH QUERY "INSERT INTO readings (device, value, ts) VALUES ('{payload.json.device}', {payload.json.value}, NOW())"
 ```
-**SQL injection:** QUERY is built by text substitution; there are no bound parameters. Only `{payload.json.key}` and
-`{payload.csv.N}` values have their single quotes doubled, so put those inside `'…'` and CAST numbers in SQL.
-Raw `{payload}`, `{value.json}` and `{topic.N}` are inserted unescaped: a `'` in a payload or topic segment
-(both are client-controlled) breaks or rewrites the statement. Never use them inside a query, and limit who may
-publish to SOURCE_TOPIC with a rule (`lot-rules`). Give the connector's database user only the rights it needs.
+**Placeholders in SQL queries** (POSTGRESQL, MYSQL, MARIADB, SQLSERVER, CRATEDB, SNOWFLAKE): each placeholder is
+placed by where it stands, so a payload or topic level cannot change the query.
+- Inside `'…'`: the value is escaped for the engine and stays one string. Use this for any text.
+- Inside `"…"`, MySQL `` `…` `` or SQL Server `[…]`: the closing quote is doubled. Use this for a table or
+  column name taken from a topic: `FROM "{topic.2}"` (`` FROM `{topic.2}` `` on MYSQL/MARIADB).
+- Inside `$$…$$` (PostgreSQL, Snowflake): a value containing `$` refuses the event.
+- Unquoted (`VALUES ({payload.json.value})`, `WHERE id = {payload}`): the value must be a number, a
+  comma-separated list of numbers, `true`, `false` or `null`. Anything else, a bare name such as `line_1`
+  included, **refuses the event**. Quote the placeholder to store it as text.
+
+`{env.NAME}` and `{secret.NAME}` are placed as they are. MongoDB and OpenSearch JSON queries are not covered
+yet, so keep their values from untrusted publishers. Limit who may publish to SOURCE_TOPIC with a rule
+(`lot-rules`) and give the connector's database user only the rights it needs.
+
+**Agent queries:** `WITH AGENT_QUERIES "read"` in `SQL_CONFIG` (or `CRATEDB_CONFIG`) lets a `DEFINE AGENT` with a
+`query_connector` grant run its own read queries (default `"off"`). Add `WITH AGENT_USERNAME` / `WITH AGENT_PASSWORD`
+(or `WITH AGENT_CONNECTION_STRING`) for a read-only login, required on SQLSERVER and CRATEDB and strongly
+recommended everywhere (the broker warns when agents would use the connector's own login), and optionally
+`WITH AGENT_MAX_ROWS 200`. Agent queries are one read statement with no backslash inside quotes (double a quote: `'it''s'`) and no delay calls (`pg_sleep`, `SLEEP`, `WAITFOR`, …). See `lot-agents`.
 
 ### MongoDB
 ```

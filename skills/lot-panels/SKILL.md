@@ -198,6 +198,63 @@ Do not generate static reused command envelopes or report publish receipts as
 host acceptance. These extensions require a compatible Hub renderer; there is
 no negotiated capability handshake yet.
 
+### Agent widgets
+
+Use these when the user wants people to **talk to, approve for, or watch a `DEFINE AGENT` from
+a dashboard** ("let operators ask the line agent", "show what the agent is waiting on", "agent
+health board"). Load `lot-agents` if you also need to define or change the agent.
+
+Name agents with properties, never `BIND`: the Hub derives every topic from the agent's name.
+`SET AGENT "<name>"` is one agent; `SET AGENTS "A, B"` is several (unset = every agent). Use the
+exact agent name from `-listAgents`.
+
+| Type | Shows | Keys | The agent needs |
+|---|---|---|---|
+| `"agent-chat"` | A chat; the user types or taps a suggestion | `AGENT` (required), `PLACEHOLDER`, `SUGGESTIONS "q1, q2"`, `SESSION "viewer"` (default) or `"fresh"`, `SHOW_STEPS "true"` (adds a closed Reasoning line) | `WITH INTERACTION_TOPIC` |
+| `"agent-approvals"` | Writes waiting on someone's OK, with Approve / Refuse | `AGENTS`, `MINE "true"` (only the viewer's requests) | a tool with `LEVEL "write_confirm"` (the default for writes) |
+| `"agent-activity"` | Live task feed; a row opens the task's tree | `AGENTS`, `VIEW "feed"` or `"tree"`, `LIMIT n` (default 20) | nothing |
+| `"agent-status"` | Status, reason, last-hour runs, errors, p95, cost | `AGENTS`, `LAYOUT "rows"` or `"cards"` | nothing |
+| `"agent-memory"` | What it remembers | `STORE "shared:<s>"`, or `AGENT` (its own store), `LIMIT n` (default 50) | `WITH LONG_TERM_MEMORY` |
+
+All five take `TITLE` and `CHROME`; none take `BIND`, `ON` events or `WITH INTERACT`.
+
+```
+DEFINE PANEL GateOps
+    WITH TITLE "Gate operations"
+    WITH LAYOUT "grid"
+    WITH COLUMNS 12
+    ADD COMPONENT "Ask" WITH TYPE "agent-chat" AT COLUMN 1 ROW 1 SPAN 6 COLUMNS SPAN 6 ROWS
+        SET AGENT "GateOpsAgent"
+        SET TITLE "Ask gate operations"
+        SET SUGGESTIONS "Which gates have faults?, Summarise the last shift"
+    ADD COMPONENT "Waiting" WITH TYPE "agent-approvals" AT COLUMN 7 ROW 1 SPAN 6 COLUMNS SPAN 4 ROWS
+        SET AGENTS "GateOpsAgent"
+        SET TITLE "Waiting for you"
+    ADD COMPONENT "Health" WITH TYPE "agent-status" AT COLUMN 7 ROW 5 SPAN 6 COLUMNS SPAN 2 ROWS
+        SET AGENTS "GateOpsAgent"
+    ADD COMPONENT "Feed" WITH TYPE "agent-activity" AT COLUMN 1 ROW 7 SPAN 6 COLUMNS SPAN 5 ROWS
+        SET AGENTS "GateOpsAgent"
+        SET LIMIT 10
+    ADD COMPONENT "Memory" WITH TYPE "agent-memory" AT COLUMN 7 ROW 7 SPAN 6 COLUMNS SPAN 5 ROWS
+        SET AGENT "GateOpsAgent"
+```
+
+Sizes that read well on a 12-column grid: chat 6×6, approvals 6×4, activity 6×5, status 6×3,
+memory 6×5. Agent widgets can sit on the same panel as gauges and charts; a panel of only agent
+widgets is fine and is the one exception to Rule 1's "at least one gauge/chart".
+
+**Who sees what is the viewer's agent permission, not the panel.** Tell the user which flag their
+viewers need: chat needs a rule letting them publish on the agent's interaction topic (steps
+need `AllowedAgentRead`); activity, status and the memory feed need `AllowedAgentRead`;
+approvals need `AllowedAgentApproval`; the full memory table needs `AllowedAgentManagement`.
+A viewer without the flag sees a locked notice. `WITH INTERACT` does not restrict these widgets.
+
+- **WRONG:** `BIND VALUE TO TOPIC "$SYS/Coreflux/Agents/GateOpsAgent/status"` on a `value` **RIGHT:** `WITH TYPE "agent-status"` + `SET AGENTS "GateOpsAgent"`
+- **WRONG:** a `text-field` + `button` publishing to `…/ask` to fake a chat **RIGHT:** `WITH TYPE "agent-chat"` + `SET AGENT`
+- **WRONG:** `agent-chat` for an agent without `INTERACTION_TOPIC` (it shows "This agent can't chat") **RIGHT:** add `WITH INTERACTION_TOPIC` to the agent first
+- **WRONG:** `agent-memory` with neither `STORE` nor an `AGENT` that has `LONG_TERM_MEMORY` **RIGHT:** one of the two
+- **WRONG:** `SET AGENTS "GateOpsAgent; Planner"` **RIGHT:** comma-separated, `"GateOpsAgent, Planner"`
+
 ### Rule 2 — TIME-SERIES FIRST
 
 Any time-based data uses a chart (`realtime-chart` for live scalars, `chart`
@@ -658,6 +715,10 @@ LIVE TRACKING — anything with a position (vehicles, vessels, people, drones,
   History trail: BIND TRACE TO TOPIC "thing/gps" (polyline from trace buffer)
   The pattern is always the same regardless of WHAT is being tracked.
 
+AN AGENT'S WORK (ask it, approve what it waits on, watch it, its health or memory)
+  → WITH TYPE "agent-chat" / "agent-approvals" / "agent-activity" / "agent-status" / "agent-memory"
+  Named by SET AGENT / SET AGENTS, never BIND. See "Agent widgets" above.
+
 CUSTOM INDUSTRIAL DIAGRAM (tank, pipe, HVAC schematic, machine layout)
   → WITH TYPE "svg"   using SET INLINE + BIND TEXT/CSS/ELEMENT
   ONLY use this when no built-in component can represent the visual.
@@ -711,6 +772,11 @@ Ask these questions in order. Stop at the first YES that applies:
   "show a switch to turn on light"     WITH TYPE "switch" + ON TOGGLE DO PUBLISH ... WITH STATE (only if user explicitly asked; NEVER auto-add next to an indicator)
   "navigate between screens"           WITH TYPE "button" + ON CLICK DO NAVIGATE
   "button that asks an agent"          WITH TYPE "button" + SET AWAIT "AnswerText" (+ "text" with SET MARKDOWN true)
+  "let operators chat with the agent"  WITH TYPE "agent-chat" + SET AGENT "<name>"
+  "show what the agent waits on"       WITH TYPE "agent-approvals" (+ SET AGENTS)
+  "what are the agents doing"          WITH TYPE "agent-activity"
+  "agent health / usage board"         WITH TYPE "agent-status"
+  "what the agent remembers"           WITH TYPE "agent-memory" + SET AGENT or SET STORE
 
 ### Quick reference — layout and navigation
 
@@ -829,7 +895,8 @@ a FALLBACK and is forbidden for numeric scalars (use `gauge` instead).
 | `"text-field"` | Free-text or numeric setpoint entry | Publishes on change |
 | `"text"` | Static or bound text strings | **Use this, NOT `"label"`** |
 | `"card"` | Layout container — groups child components | — |
-| `"value"` | **FALLBACK ONLY** — non-numeric counters or status strings where `text` is wrong | ❌ HARD BAN: never use for numeric scalars (use `gauge`) — every panel must contain at least one `gauge`/`chart`/`realtime-chart`/`indicator`/`map`/`svg` |
+| `"agent-chat"`, `"agent-approvals"`, `"agent-activity"`, `"agent-status"`, `"agent-memory"` | A `DEFINE AGENT`'s chat, approvals, tasks, health, memory | `SET AGENT` / `SET AGENTS`, never `BIND`; see "Agent widgets" |
+| `"value"` | **FALLBACK ONLY** — non-numeric counters or status strings where `text` is wrong | ❌ HARD BAN: never use for numeric scalars (use `gauge`) — every panel must contain at least one `gauge`/`chart`/`realtime-chart`/`indicator`/`map`/`svg` (or agent widget) |
 
 > ❌ NEVER use `WITH TYPE "label"` — there is no `label` renderer. The parser rewrites it to `"text"` and warns.  
 > ✅ Use `WITH TYPE "text"` for all text display (static labels, bound strings, timestamps).

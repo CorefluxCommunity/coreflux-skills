@@ -1,5 +1,5 @@
 {
-  "brokerVersion": "2.22.7-rc.223",
+  "brokerVersion": "2.22.7-rc.223+3f6ea764",
   "skills": [
     {
       "name": "broker-operations",

@@ -47,6 +47,7 @@ priority 1000, the same way BACnet write priority and ISA-18.2 alarm priority wo
 | ActionManagementRun | Running an action on demand |
 | ActionManagementRemove / ModelManagementRemove / RouteManagementRemove / RuleManagementRemove | Removing entities |
 | AgentManagementCreation / AgentManagementRemove / ThingManagementCreation / ThingManagementRemove | Agents and things |
+| SkillManagementCreation / SkillManagementRemove / MemoryManagement | Stored agent skills, and agents' long-term memory stores |
 | UserManagementUpdate / UserManagementPasswordChange / UserManagementRemove | User changes |
 | LogManagementCreation / LogManagementUpdate / LogManagementRemove / LogManagementRead | Log traces |
 | ShellCommand / McpTokenManagement | Shell commands, MCP tokens |
@@ -69,9 +70,11 @@ IF USER IS "admin" THEN
 ```
 
 ### User permissions
-USER HAS reads a boolean flag on the user. Only three exist: `AllowedSystemConfiguration`,
-`AllowedUserManagement`, `AllowedLogManagement`. Any other name is silently false; the
-validator does not flag it.
+USER HAS reads a boolean flag on the user. Six exist: `AllowedSystemConfiguration`,
+`AllowedUserManagement`, `AllowedLogManagement`, and the agent flags `AllowedAgentRead`,
+`AllowedAgentApproval` and `AllowedAgentManagement`. Any other name is silently false; the
+validator does not flag it. The agent flags are granted with `-changeUserSettings`; the seeded
+`$SYS` rules already admit them, so a rule is only needed to use them on ordinary topics.
 ```
 IF USER HAS "AllowedSystemConfiguration" THEN
     ALLOW
