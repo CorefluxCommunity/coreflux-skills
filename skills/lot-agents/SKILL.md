@@ -7,38 +7,38 @@ description: "How to write a DEFINE AGENT: the TYPE LLM connector it uses, requi
 
 An agent is its own LoT entity, not a connector. It runs on a `TYPE LLM` connector that holds the
 provider, model and key, and it can do nothing until `ADD TOOL` grants a tool. It is deployed
-with `-addAgent`, never `-addRoute`. An in-broker agent deploys one only with a `create_lot`
+with `-addAgent`, never `-addRoute`. An in-broker agent deploys one only with a `lot_write`
 grant for target `agent`, and every such deploy waits for a person to approve it; load
 `create-agent` before designing one for a user.
 
 ## CRITICAL SYNTAX
 
 - `DEFINE AGENT <Name>` — unquoted name: letters, digits, `_` and `-`.
-- `USES LLM ROUTE <LlmRoute>` (or `USES LLM CONNECTOR <LlmRoute>`) is the **first** body line, unquoted. That connector must be `TYPE LLM`.
+- `USES LLM CONNECTOR <name>` (or `USES LLM ROUTE <name>`) is the **first** body line, unquoted. That connector must be `TYPE LLM`.
 - `WITH DEFAULT_USER "<user>"` is **required**. It is the broker user a task runs as when no MQTT
   user started it (a `CALL AGENT` from an action). There is no implicit admin.
 - Every other value is quoted: `WITH DESCRIPTION "…"`. `GET SECRET` / `GET ENV` work anywhere.
 - 4-space indent; `ADD TOOL` settings are indented one more level.
-- There is no `DEFINE ROUTE … WITH TYPE AGENT` and no `AGENT_CONFIG`; both were removed.
+- There is no `DEFINE CONNECTOR … WITH TYPE AGENT` (`DEFINE ROUTE` is the same) and no `AGENT_CONFIG`; both were removed.
 
 ## Minimal agent
 
 ```
-DEFINE ROUTE Gpt WITH TYPE LLM
+DEFINE CONNECTOR Gpt WITH TYPE LLM
     ADD LLM_CONFIG
         WITH PROVIDER "openai"
         WITH MODEL "gpt-5.5"
         WITH API_KEY GET SECRET "OPENAI_API_KEY"
 
 DEFINE AGENT LineAssistant
-    USES LLM ROUTE Gpt
+    USES LLM CONNECTOR Gpt
     WITH DESCRIPTION "Answers questions about production line 1"
     WITH DEFAULT_USER "line1-agent"
     WITH SYSTEM_PROMPT "You watch line 1. Answer from live data and say when data is stale."
     WITH INTERACTION_TOPIC "agents/line1"
-    ADD TOOL "read_mqtt"
+    ADD TOOL "mqtt_read"
         WITH TOPICS "lines/1/#"
-    ADD TOOL "write_mqtt"
+    ADD TOOL "mqtt_write"
         WITH TOPICS "reports/line1/#"
         WITH LEVEL "write"
 ```
@@ -49,7 +49,7 @@ Deploy the LLM connector first, then the agent.
 
 | Clause | Default | Meaning |
 |---|---|---|
-| `USES LLM ROUTE <name>` | required | The `TYPE LLM` connector the agent runs on |
+| `USES LLM CONNECTOR <name>` | required | The `TYPE LLM` connector the agent runs on. `USES LLM ROUTE` is the same clause |
 | `WITH DEFAULT_USER` | required | Principal when no MQTT user started the task |
 | `WITH DESCRIPTION` | `"Agent <name>."` | Card text; peers and the Hub read it |
 | `WITH SYSTEM_PROMPT` | — | Persona and operating instructions |
@@ -74,9 +74,11 @@ Deploy the LLM connector first, then the agent.
 | `WITH HUB_VISIBLE` | `"false"` | Show in the Hub chat picker |
 
 Refused with a message naming the release that brings them: `EXTERNAL_ACCESS "true"`,
-`WITH EXTERNAL_WRITES`, `ADD TOOL "run_lot_once"`. Legacy settings
-(`MODEL`, `PROVIDER`, `TOOLS`, `BROKER_TOOLS`, `MCP_ROUTES`, `ACTIONS`, `ENABLED_COMMANDS`,
+`WITH EXTERNAL_WRITES`, `ADD TOOL "lot_run"`. Legacy settings
+(`MODEL`, `PROVIDER`, `TOOLS`, `BROKER_TOOLS`, `ACTIONS`, `ENABLED_COMMANDS`,
 `INTERACTION_MODE`) are refused too: model settings belong on the LLM connector, tools on `ADD TOOL`.
+The one exception is `WITH MCP_ROUTES "A, B"`, still accepted as `ADD TOOL "mcp"` on `A.*` and
+`B.*` at `LEVEL "write_confirm"`; write the `ADD TOOL "mcp"` form in new agents.
 Any other clause name is refused as unknown.
 
 ## ADD TOOL grants
@@ -85,24 +87,34 @@ Nothing is granted by default. Each grant names one tool and its scope:
 
 | Tool | Scope | Level |
 |---|---|---|
-| `read_mqtt` | `WITH TOPICS "a/#, b/+"` (required) | read |
-| `write_mqtt` | `WITH TOPICS` (required) | `WITH LEVEL "write"` |
-| `read_lot` | `WITH TARGET "<kind or name>"` (optional) — kinds: action, model, route, rule, panel, agent, python, thing | read |
-| `create_lot` | `WITH TARGET "action, rule"` — kinds: action, model, route, rule, panel, skill, agent | `write_confirm` (default) or `"write"` |
-| `execute_connectors` (alias `execute_routes`) | `WITH TARGET "<connector>"` or `"<connector>.<event>"` (required) | `write_confirm` (default) or `"write"` |
-| `execute_actions` | `WITH TARGET "<action>"` (required) | `write_confirm` (default) or `"write"` |
-| `query_connector` | `WITH TARGET "<connector>"` (required); the connector needs `WITH AGENT_QUERIES "read"` | read |
+| `mqtt_read` | `WITH TOPICS "a/#, b/+"` (required) | read |
+| `mqtt_write` | `WITH TOPICS` (required) | `WITH LEVEL "write"` |
+| `lot_read` | `WITH TARGET "<kind or name>"` (optional) — kinds: action, model, route, rule, panel, agent, python, thing | read |
+| `lot_write` | `WITH TARGET "action, rule"` — kinds: action, model, route, rule, panel, skill, agent | `write_confirm` (default) or `"write"` |
+| `connector_run` | `WITH TARGET "<connector>"` or `"<connector>.<event>"` (required) | `write_confirm` (default) or `"write"` |
+| `action_run` | `WITH TARGET "<action>"` (required) | `write_confirm` (default) or `"write"` |
+| `connector_query` | `WITH TARGET "<connector>"` (required); the connector needs `WITH AGENT_QUERIES "read"` | read |
+| `mcp` | `WITH TARGET "<Conn>.<tool>"` or `"<Conn>.*"` (required) — `<Conn>` is a `WITH TYPE MCP` connector | `"read"`, `write_confirm` (default) or `"write"` |
+
+Each tool also deploys under its earlier name, the one your own function carries
+(`broker__read_mqtt`): `read_mqtt`, `write_mqtt`, `read_lot`, `create_lot`, `execute_actions`,
+`execute_routes` / `execute_connectors`, `query_connector`. Write the names above in new LoT.
 
 - A writing grant defaults to `WITH LEVEL "write_confirm"`: each call waits until a person
   approves it (the task shows `input_required` meanwhile). `WITH LEVEL "write"` runs writes
   without asking.
-- `+` and `#` must fill a whole topic level. `write_mqtt` can never publish under
+- `+` and `#` must fill a whole topic level. `mqtt_write` can never publish under
   `$SYS/Coreflux/Agents/`.
-- `create_lot` with target `agent` or `skill` is refused at `LEVEL "write"`: authoring those
+- `lot_write` with target `agent` or `skill` is refused at `LEVEL "write"`: authoring those
   always waits for approval. Target `agent` is never implied by other targets.
-- `query_connector` runs a query the agent writes against a SQL or CrateDB connector, inside a
+- `connector_query` runs a query the agent writes against a SQL or CrateDB connector, inside a
   read-only transaction or as the connector's `AGENT_USERNAME`, and returns the rows. Its
   `operation` `"schema"` lists the tables and columns first.
+- `mcp` offers each covered tool of the MCP connector as its own function,
+  `mcp__<Conn>__<tool>`, with the server's own input schema. `LEVEL "read"` offers only the tools
+  the server marks read-only (`readOnlyHint`). Each call is also checked as a `PublishSys` on
+  `$SYS/Coreflux/Routes/<Conn>/Tools/<tool>/Call`, which is default-deny (root too), so an
+  operator must add a rule allowing it — the same rule governs LoT `CALL MCP`.
 - `TOPICS` is refused on the other tools, `TARGET` on the MQTT tools, `LEVEL` on read tools.
   Grants of one tool are merged.
 - A grant is not a permission: every tool call is also checked against the ACL of the user the
@@ -187,9 +199,9 @@ Viewers see them according to their own agent flags (`AllowedAgentRead`, `Allowe
 
 ## Common Mistakes
 
-- **WRONG:** `DEFINE ROUTE Assistant WITH TYPE AGENT` **RIGHT:** `DEFINE AGENT Assistant` + `USES LLM ROUTE <llm>`
+- **WRONG:** `DEFINE CONNECTOR Assistant WITH TYPE AGENT` **RIGHT:** `DEFINE AGENT Assistant` + `USES LLM CONNECTOR <llm>`
 - **WRONG:** `WITH MODEL "gpt-5.5"` on the agent **RIGHT:** model, provider and key on the `TYPE LLM` connector
-- **WRONG:** `ADD TOOL "write_mqtt"` with no `LEVEL` and expecting it to run unattended **RIGHT:** no `LEVEL` means each write waits for approval; add `WITH LEVEL "write"` only for unattended writes
-- **WRONG:** `ADD TOOL "read_mqtt"` with no `TOPICS` **RIGHT:** `WITH TOPICS "lines/1/#"`
+- **WRONG:** `ADD TOOL "mqtt_write"` with no `LEVEL` and expecting it to run unattended **RIGHT:** no `LEVEL` means each write waits for approval; add `WITH LEVEL "write"` only for unattended writes
+- **WRONG:** `ADD TOOL "mqtt_read"` with no `TOPICS` **RIGHT:** `WITH TOPICS "lines/1/#"`
 - **WRONG:** `CALL AGENT "Planner" METHOD "execute"` **RIGHT:** `CALL AGENT "Planner.execute"` with an indented `WITH (task = …)`
 - **WRONG:** deploying an agent with `-addRoute` **RIGHT:** `-addAgent`

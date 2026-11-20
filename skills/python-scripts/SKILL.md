@@ -55,7 +55,9 @@ WITH and RETURN AS each sit on their own line, indented under CALL PYTHON; the o
 form is rejected. Arguments are passed in parentheses, comma-separated.
 Pass strings, numbers, booleans or variables — an array literal (`WITH ([10, 20, 30])`)
 fails to compile, so pass a JSON string and `json.loads` it. A variable read from PAYLOAD
-without `AS DOUBLE`/`AS INT` arrives as a Python `str`.
+without `AS DOUBLE`/`AS INT` arrives as a Python `str`. `PAYLOAD AS BYTES` (and other LoT
+binary values) arrive as Python `bytes` on both embedded and runner paths — not a
+base64 or latin-1 string.
 
 ## Available Modules
 
@@ -67,6 +69,7 @@ The broker does not restrict imports. The Python standard library is available, 
 - re — regular expressions
 - csv, io — data parsing
 - hashlib, base64 — encoding/hashing
+- struct — pack/unpack binary frames
 
 Third-party packages (numpy, requests, …) must be installed first with
 `broker.install_python_package` (pip); list them with `broker.list_python_packages`.
@@ -153,13 +156,16 @@ def check_thresholds(value, config_json):
 
 ## Common Mistakes
 - Missing `# Script Name:` header — the script will fail to register
-- A function that raises, or runs past 30 seconds, makes RETURN AS the text null (error in the
-  broker log) and the action carries on — return a `success` flag and check it
+- A failing CALL PYTHON (Python exception, missing module or function, no runtime, or a
+  30-second timeout) raises into TRY / CATCH and ON ERROR — it does not return the text null
+  or keep the action running past the failure. Wrap the call in TRY when a failure should be
+  tolerated, or handle it with ON ERROR
 - Script name must be in the first 10 lines of the code
 - Function names must be valid Python identifiers
 - Return values become a JSON string before RETURN AS: dict/list/number/bool are serialized;
-  a Python str (including json.dumps output) is kept as-is; None becomes null
+  a Python str (including json.dumps output) is kept as-is; None becomes LoT NULL
 - Prefer returning a dict and reading fields with GET JSON — json.dumps() is optional
-- Missing GET JSON keys do not crash the action (AS BOOL/INT/DOUBLE → false/0)
+- Missing GET JSON keys and JSON null are LoT NULL; AS BOOL / AS INT / AS DOUBLE on NULL or on
+  a missing key raise (AS STRING yields "")
 - When calling from LOT, use dot notation: "ScriptName.function_name"
 - Arguments are positional — order matters

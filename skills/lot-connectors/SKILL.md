@@ -1,28 +1,29 @@
 ---
-name: lot-routes
-description: "How to write LOT connectors: database, OT (Modbus, S7, OPC UA, EtherNet/IP, ADS, Allen-Bradley, Fins), REST API, AI (LLM, MCP), MQTT bridge/cluster, Kafka/REST integrations, email, barcode, video, events, mappings, and OT TAG blocks."
+name: lot-connectors
+description: "How to write LOT connectors (routes): database, OT (Modbus, S7, OPC UA, EtherNet/IP, ADS, Allen-Bradley, Fins), REST API, AI (LLM, MCP), MQTT bridge/cluster, Kafka/REST integrations, email, barcode, video, events, mappings, and OT TAG blocks."
 ---
 
 # LOT Connectors — Complete Reference
 
-Connectors are written `DEFINE ROUTE`; `DEFINE CONNECTOR` is a synonym (and `ADD CONNECTOR_CONFIG` of
-`ADD ROUTE_CONFIG`). Both spellings deploy the same connector and are stored exactly as typed. The
-examples below use `DEFINE ROUTE`, which every broker version accepts.
+Connectors are written `DEFINE CONNECTOR`, and the cross-type overload block is `ADD CONNECTOR_CONFIG`.
+`DEFINE ROUTE` and `ADD ROUTE_CONFIG` are the earlier spellings of those same declarations. Both
+spellings deploy the same connector and are stored exactly as typed. The examples below use
+`DEFINE CONNECTOR`.
 
 ## CRITICAL SYNTAX
 
 Connector, event, and mapping names are NEVER quoted (bare identifiers). String values ARE quoted.
 ```
-WRONG:  DEFINE ROUTE "ProductionDB" WITH TYPE POSTGRESQL
-RIGHT:  DEFINE ROUTE ProductionDB WITH TYPE POSTGRESQL
+WRONG:  DEFINE CONNECTOR "ProductionDB" WITH TYPE POSTGRESQL
+RIGHT:  DEFINE CONNECTOR ProductionDB WITH TYPE POSTGRESQL
 
-WRONG:  DEFINE ROUTE "MyLLM" WITH TYPE LLM
-RIGHT:  DEFINE ROUTE MyLLM WITH TYPE LLM
+WRONG:  DEFINE CONNECTOR "MyLLM" WITH TYPE LLM
+RIGHT:  DEFINE CONNECTOR MyLLM WITH TYPE LLM
 ```
 
 ## Shapes by connector family
 
-Not every connector uses the same blocks. Match **WITH TYPE** to the config block and pattern below. Call **`broker.get_route_template("TYPE")`** for the authoritative template with all available settings for any connector type.
+Not every connector uses the same blocks. Match **WITH TYPE** to the config block and pattern below. Call **`broker.get_connector_template("TYPE")`** for the authoritative template with all available settings for any connector type.
 
 **Vendor REST APIs:** when the user names a SaaS or vendor API (Airtable, ServiceNow, SAP, Salesforce, AWS, Azure, Slack, …), load **`rest-api-connectors`** first. It lists REST API apps — ready-made `TYPE REST_API` connectors — by app code; `load_skill("rest-api-connectors/<APP_CODE>")` returns one with auth, events and topics already written. An app code is never a `WITH TYPE`.
 
@@ -38,7 +39,7 @@ Not every connector uses the same blocks. Match **WITH TYPE** to the config bloc
 | GRPC (STREAMING) | **ADD GRPC_CONFIG** + **ADD EVENT** with **SOURCE_TOPIC**/**DESTINATION_TOPIC**; **RPC_TYPE** UNARY / SERVER_STREAM / CLIENT_STREAM / BIDI; empty payload = CloseSend on streams; **SESSION_SCOPE** TOPIC (default) or EVENT (one BIDI Call shared across SOURCE `+` topics until **IDLE_TIMEOUT** / CloseSend) |
 | MQTT_BRIDGE (SYSTEM) | **ADD SOURCE_CONFIG** + **ADD DESTINATION_CONFIG** + **ADD MAPPING** |
 | MQTT_CLUSTER (SYSTEM) | **ADD CLUSTER_CONFIG** |
-| FEDERATION (SYSTEM) | **ADD FEDERATION_CONFIG** (REMOTE_CLUSTER_ID, REMOTE_ADDRESS/REMOTE_PORT or REMOTE_ENDPOINTS, CONTROL_LANE/CONTROL_PUSH/CONTROL_SCOPE, DATA_LANE/DATA_OUTBOUND/DATA_INBOUND); no template, so `get_route_template` has nothing for it |
+| FEDERATION (SYSTEM) | **ADD FEDERATION_CONFIG** (REMOTE_CLUSTER_ID, REMOTE_ADDRESS/REMOTE_PORT or REMOTE_ENDPOINTS, CONTROL_LANE/CONTROL_PUSH/CONTROL_SCOPE, DATA_LANE/DATA_OUTBOUND/DATA_INBOUND); no template, so `get_connector_template` has nothing for it |
 | SPARKPLUG_B (SYSTEM) | **ADD SPARKPLUG_CONFIG** + optional **ADD METRIC** / **ADD DEVICE**; no **ADD EVENT** |
 | SPARKPLUG_HOST (SYSTEM) | **ADD SPARKPLUG_HOST_CONFIG** + optional command-overlay **ADD METRIC**; no **ADD EVENT** |
 
@@ -71,7 +72,7 @@ Do **NOT** put the "write to PLC" topic in **SOURCE_TOPIC** — **SOURCE_TOPIC**
 OT **ADD MAPPING** with **ADD TAG**: mapping **SOURCE_TOPIC** is the per-tag publish prefix (see **OT mappings - MQTT topics for TAG polling** above).
 
 ```
-DEFINE ROUTE <name> WITH TYPE <ROUTE_TYPE>
+DEFINE CONNECTOR <name> WITH TYPE <ROUTE_TYPE>
     ADD <CONFIG_TYPE>
         WITH <SETTING> <value>
     ADD EVENT <eventName>
@@ -144,16 +145,17 @@ VIDEO_INPUT always publishes JPEG frames. Do not use WITH FORMAT on the connecto
 
 AUDIO_INPUT always publishes raw 16-bit little-endian PCM chunks. Do not use WITH FORMAT. Use SOURCE mic:N (macOS/Linux), audio=Device Name (Windows), anullsrc, or tone:440. SAMPLE_RATE defaults to 16000, CHANNELS to 1, CHUNK_MS to 100.
 
-## Overload / Backpressure Configuration (ADD ROUTE_CONFIG — cross-type)
+## Overload / Backpressure Configuration (ADD CONNECTOR_CONFIG — cross-type)
 
-Unlike every other config block above, **ADD ROUTE_CONFIG** is not tied to a connector type — it may be
+Unlike every other config block above, **ADD CONNECTOR_CONFIG** is not tied to a connector type — it may be
 added to **any** connector, alongside its type-specific config block, to control what happens when the
-shared connector channel is saturated (and, on a cluster, where the connector runs). Every setting is optional; an absent block inherits the
+shared connector channel is saturated (and, on a cluster, where the connector runs). `ADD ROUTE_CONFIG` is
+the earlier spelling of this block. Every setting is optional; an absent block inherits the
 broker-wide default.
 
 ```
-DEFINE ROUTE HistorianDB WITH TYPE POSTGRESQL
-    ADD ROUTE_CONFIG
+DEFINE CONNECTOR HistorianDB WITH TYPE POSTGRESQL
+    ADD CONNECTOR_CONFIG
         WITH OVERLOAD_POLICY "balanced"
         WITH OVERLOAD_TIMEOUT 200
         WITH OVERLOAD_CAPACITY 20000
@@ -179,7 +181,7 @@ DEFINE ROUTE HistorianDB WITH TYPE POSTGRESQL
 sheds once exhausted, which would silently break the "lossless never sheds" guarantee. Declaring
 both logs an error and the connector runs with capacity forced back to unbounded; lossless always wins.
 
-The broker-wide default (what a connector without ADD ROUTE_CONFIG inherits) comes from two environment
+The broker-wide default (what a connector without ADD CONNECTOR_CONFIG inherits) comes from two environment
 variables read at broker start: `COREFLUX_ROUTE_OVERLOAD_POLICY` (`lossless` / `balanced` / `realtime`,
 default `balanced`) and `COREFLUX_ROUTE_CHANNEL_FULL_TIMEOUT_MS` (the `balanced` wait, default 50).
 `COREFLUX_ROUTE_CHANNEL_CAPACITY` sizes the shared connector channel (default 100000, minimum 1024).
@@ -188,7 +190,7 @@ default `balanced`) and `COREFLUX_ROUTE_CHANNEL_FULL_TIMEOUT_MS` (the `balanced`
 
 Use GET ENV and GET SECRET for sensitive configuration:
 ```
-DEFINE ROUTE MyDB WITH TYPE POSTGRESQL
+DEFINE CONNECTOR MyDB WITH TYPE POSTGRESQL
     ADD SQL_CONFIG
         WITH SERVER GET ENV "PG_HOST"
         WITH PORT 5432
@@ -232,6 +234,47 @@ neither SOURCE_TOPIC nor EVERY is accepted but never runs. **DESTINATION_TOPIC**
 so a write-only event (an INSERT) can omit it. KAFKA rejects EVERY on events; KAFKA and GRPC events need both topics.
 Every event that registers (SOURCE_TOPIC or EVERY) uses one action slot of the license's action limit.
 
+### Running an event on demand (MCP `run_connector`)
+
+To run a deployed event now and see what it returns — "read with that event", "run the query" —
+call the MCP tool **`run_connector`** instead of publishing to SOURCE_TOPIC and reading the result
+back yourself. It is the agent `connector_run` tool for MCP clients, plus the result: it runs the
+event exactly as a publish to its SOURCE_TOPIC would (`parameters`, a JSON object, fill `{field}`
+placeholders), waits for the first message on the event's DESTINATION_TOPIC and returns it.
+
+| Argument | Meaning |
+|----------|---------|
+| `target` | Required. `<connector>.<event>`, names as in `DEFINE CONNECTOR` / `ADD EVENT` |
+| `parameters` | Optional. A JSON object whose fields fill `{field}` placeholders, or a string |
+| `source_topic` | Only when SOURCE_TOPIC has `+`/`#`: the concrete topic to run as (fills `{topic.N}` and DESTINATION_TOPIC wildcards) |
+| `wait_ms` | Default 5000, max 30000; `0` fires without waiting |
+
+The result has `outcome` `result` (with `payload`, capped at 64 KB), `timeout` (raise `wait_ms`, or
+check the connector), `no_destination` (no DESTINATION_TOPIC: it ran, nothing to return) or `fired`.
+The caller needs PublishSys on `$SYS/Coreflux/Routes/<connector>/Events/<event>/Trigger` or Publish
+on SOURCE_TOPIC, and Subscribe on DESTINATION_TOPIC. It is a write tool (an event can store data),
+so it asks for approval and is hidden in Insight mode. In a cluster, a FILE_STORAGE or OT connector
+runs on one node only; on any other node the tool refuses and names that node.
+
+A FILE_STORAGE read event, then running it:
+
+```
+DEFINE CONNECTOR ShiftArchive WITH TYPE FILE_STORAGE
+    ADD FILE_STORAGE_CONFIG
+        WITH STORAGE_DIR "archive"
+        WITH FILE_PATTERN "{0}.json"
+    ADD EVENT ReadLine
+        WITH SOURCE_TOPIC "archive/query/+"
+        WITH DESTINATION_TOPIC "archive/result/+"
+        WITH QUERY "CLEAN:{table: {topic.3}}"
+```
+
+`run_connector` with `target` `ShiftArchive.ReadLine` and `source_topic` `archive/query/line1` reads
+`line1.json` and returns its rows as published on `archive/result/line1`. For an ad-hoc read-only SQL
+statement on a database connector that sets `AGENT_QUERIES`, use **`query_connector`** instead (the
+agent `connector_query` tool). Inside a DEFINE AGENT the grants are `connector_run` (fires the event,
+no result) and `connector_query`.
+
 ## Mappings (scheduled / periodic polling)
 
 OT **ADD TAG** mappings: polled values publish to **SOURCE_TOPIC/tagName** (no **DESTINATION_TOPIC** for that).
@@ -274,7 +317,7 @@ OFFSET, MIN_VALUE and MAX_VALUE may be negative (`WITH OFFSET -40`).
 
 ### PostgreSQL
 ```
-DEFINE ROUTE ProductionDB WITH TYPE POSTGRESQL
+DEFINE CONNECTOR ProductionDB WITH TYPE POSTGRESQL
     ADD SQL_CONFIG
         WITH SERVER GET ENV "PG_HOST"
         WITH PORT 5432
@@ -304,6 +347,8 @@ placed by where it stands, so a payload or topic level cannot change the query.
 yet, so keep their values from untrusted publishers. Limit who may publish to SOURCE_TOPIC with a rule
 (`lot-rules`) and give the connector's database user only the rights it needs.
 
+**Pool and write concurrency:** optional `SQL_CONFIG` keys `MAX_POOL_SIZE`, `MIN_POOL_SIZE`, `CONNECTION_IDLE_LIFETIME`, `CONNECTION_LIFETIME` wire into the driver pool; omit to keep driver defaults (`MIN_POOL_SIZE` ≤ `MAX_POOL_SIZE`). `WRITE_CONCURRENCY` (alias `MAX_CONCURRENT_WRITES`) caps in-flight MQTT-triggered SQL events; `WRITE_QUEUE_FULL_POLICY` is `block` (default unbounded back-pressure; `WRITE_QUEUE_CAPACITY` ignored), `drop_oldest`, or `drop_newest` (capacity default 1000). A bad INSERT, PostgreSQL `53300`, or pool-exhausted keeps the connector Connected; only transport failures disconnect.
+
 **Agent queries:** `WITH AGENT_QUERIES "read"` in `SQL_CONFIG` (or `CRATEDB_CONFIG`) lets a `DEFINE AGENT` with a
 `query_connector` grant run its own read queries (default `"off"`). Add `WITH AGENT_USERNAME` / `WITH AGENT_PASSWORD`
 (or `WITH AGENT_CONNECTION_STRING`) for a read-only login, required on SQLSERVER and CRATEDB and strongly
@@ -312,7 +357,7 @@ recommended everywhere (the broker warns when agents would use the connector's o
 
 ### MongoDB
 ```
-DEFINE ROUTE LogsDB WITH TYPE MONGODB
+DEFINE CONNECTOR LogsDB WITH TYPE MONGODB
     ADD MONGODB_CONFIG
         WITH CONNECTION_STRING GET ENV "MONGO_URI"
         WITH DATABASE "logs"
@@ -323,11 +368,52 @@ DEFINE ROUTE LogsDB WITH TYPE MONGODB
 
 A MongoDB insert QUERY must name both `collection:` and `document:`; any other QUERY is treated as a find.
 
+### File Storage
+```
+DEFINE CONNECTOR Packer01History WITH TYPE FILE_STORAGE
+    ADD FILE_STORAGE_CONFIG
+        WITH STORAGE_DIR "packer01_history"
+        WITH FORMAT "CSV"
+        WITH FILE_PATTERN "{0}.csv"
+    ADD EVENT StorePacker01State
+        WITH SOURCE_TOPIC "factory/packer01/state"
+        WITH QUERY "CLEAN:{table: packer01_state, data: {value.json}}"
+    ADD EVENT QueryPacker01State
+        WITH SOURCE_TOPIC "historian/packer01/query"
+        WITH DESTINATION_TOPIC "historian/packer01/result"
+        WITH QUERY "CLEAN:{table: packer01_state, filter: {}, sort: {timestamp: -1}, limit: 100}"
+```
+
+Use a **relative** `STORAGE_DIR` (e.g. `"machine_history"`). It resolves under the broker storage
+root, `<data path>/storage`, on every host: the Docker data volume, a systemd or Windows service, or a
+dev run. Never guess an absolute host path such as `/data`: it is read-only or missing on many hosts.
+An absolute path is right only when the operator names it. `..` may not leave the storage root, and the
+broker's own state, config, projects and log directories are refused. `add_connector` / `deploy_lot` probe
+the directory before accepting the connector; a failure names the storage root and a relative
+`STORAGE_DIR` to retry with. Over MCP, `get_storage_locations` reports the storage root, whether it is
+writable, and a recommended relative directory.
+
+**Store vs read.** A QUERY whose object has a top-level `data` key **stores** one row (`data:
+{value.json}` stores the JSON payload; a `timestamp` column is added unless `INCLUDE_TIMESTAMP false`).
+A QUERY with no top-level `data` **reads** the table on demand: any publish to its `SOURCE_TOPIC`
+runs it, and the matching rows are published to `DESTINATION_TOPIC` as one JSON array (a read with
+no `DESTINATION_TOPIC` returns nothing). Read options, all optional, work on CSV and JSON alike:
+
+| Key | Example | Meaning |
+|-----|---------|---------|
+| `filter` | `{state: RUNNING}` · `{count: {$gte: 7}}` | Exact value, or operators `$eq` `$ne` `$gt` `$gte` `$lt` `$lte` `$in` `$nin` `$regex`. CSV cells compare as numbers when the operand is a number. |
+| `sort` | `{timestamp: -1}` | `1` ascending, `-1` descending; several fields allowed. |
+| `limit` / `skip` | `limit: 100` | Row count; `limit` applies before `skip`. |
+| `projection` | `[state, timestamp]` | Only these fields. |
+
+A filter on a field called `data` is fine (`filter: {data: y}`): only a top-level `data` key makes
+a store. Separate keys with `,` or `;`.
+
 ## OT Connector Examples
 
 ### Modbus TCP
 ```
-DEFINE ROUTE PLC1 WITH TYPE MODBUS_TCP
+DEFINE CONNECTOR PLC1 WITH TYPE MODBUS_TCP
     ADD MODBUS_CONFIG
         WITH IP "192.168.1.100"
         WITH PORT 502
@@ -353,7 +439,7 @@ addresses (`400001`, `300001`, `100001`) are converted; `"40001"` is register of
 
 ### Modbus RTU (MODBUS_SERIAL)
 ```
-DEFINE ROUTE BoilerRtu WITH TYPE MODBUS_SERIAL
+DEFINE CONNECTOR BoilerRtu WITH TYPE MODBUS_SERIAL
     ADD MODBUS_CONFIG
         WITH COM_PORT "/dev/ttyUSB0"
         WITH BAUD_RATE 19200
@@ -377,7 +463,7 @@ STOP_BITS ONE/TWO/ONEPOINTFIVE; SLAVE_ID 1–247 on a serial line.
 
 ### BACnet/IP
 ```
-DEFINE ROUTE BMS WITH TYPE BACNET
+DEFINE CONNECTOR BMS WITH TYPE BACNET
     ADD BACNET_CONFIG
         WITH IP "127.0.0.1"
         WITH PORT 47808
@@ -399,7 +485,7 @@ DEFINE ROUTE BMS WITH TYPE BACNET
 
 ### Siemens S7
 ```
-DEFINE ROUTE S7PLC WITH TYPE SIEMENS_S7
+DEFINE CONNECTOR S7PLC WITH TYPE SIEMENS_S7
     ADD S7_CONFIG
         WITH IP "192.168.1.50"
         WITH CPU_TYPE "S71500"
@@ -417,7 +503,7 @@ accepted). Anything else, such as `LOGO`, fails validation. SLOT is usually 1 fo
 
 ### OPC UA
 ```
-DEFINE ROUTE OpcServer WITH TYPE OPCUA
+DEFINE CONNECTOR OpcServer WITH TYPE OPCUA
     ADD OPCUA_CONFIG
         WITH ENDPOINT_URL "opc.tcp://192.168.1.200:4840"
         WITH USE_SECURITY false
@@ -431,7 +517,7 @@ DEFINE ROUTE OpcServer WITH TYPE OPCUA
 
 ### EtherNet/IP (CIP explicit messaging)
 ```
-DEFINE ROUTE PackagingLine WITH TYPE ETHERNETIP
+DEFINE CONNECTOR PackagingLine WITH TYPE ETHERNETIP
     ADD ETHERNETIP_CONFIG
         WITH IP "192.168.10.20"
         WITH PORT 44818
@@ -447,7 +533,7 @@ Logix tag name. IP is required; PORT defaults to 44818.
 
 ### Beckhoff ADS / TwinCAT
 ```
-DEFINE ROUTE Press1 WITH TYPE ADS
+DEFINE CONNECTOR Press1 WITH TYPE ADS
     ADD ADS_CONFIG
         WITH TARGET_NET_ID "192.168.1.50.1.1"
         WITH TARGET_IP "192.168.1.50"
@@ -468,7 +554,7 @@ takes `"indexGroup,indexOffset"`.
 
 ### Omron FINS
 ```
-DEFINE ROUTE Oven1 WITH TYPE FINS
+DEFINE CONNECTOR Oven1 WITH TYPE FINS
     ADD FINS_CONFIG
         WITH IP "192.168.1.60"
         WITH PORT 9600
@@ -492,7 +578,7 @@ The broker is the device: it serves registers (Modbus) or nodes (OPC UA) to exte
 come from MQTT. The direction is the reverse of an OT client: publishing to a tag's **SOURCE_TOPIC**
 (`<mapping SOURCE_TOPIC>/<tag name>` by default) sets the served value.
 ```
-DEFINE ROUTE PlantModbus WITH TYPE MODBUS_SERVER
+DEFINE CONNECTOR PlantModbus WITH TYPE MODBUS_SERVER
     ADD MODBUS_SERVER_CONFIG
         WITH PORT 502
         WITH UNIT_ID 1
@@ -508,12 +594,12 @@ DEFINE ROUTE PlantModbus WITH TYPE MODBUS_SERVER
 On MODBUS_SERVER every TAG needs ADDRESS and ADDRESS_TYPE, and a master's write to a WRITABLE HOLDING_REGISTER/COIL is
 published to **DESTINATION_TOPIC**. On OPCUA_SERVER (OPCUA_SERVER_CONFIG: SERVER_PORT default 4840, ALLOW_ANONYMOUS
 default true) a client's write to a WRITABLE node is published back to the tag's **SOURCE_TOPIC**. Call
-`get_route_template` for the full setting list of either.
+`get_connector_template` for the full setting list of either.
 
 ## REST API Connector
 
 ```
-DEFINE ROUTE WeatherAPI WITH TYPE REST_API
+DEFINE CONNECTOR WeatherAPI WITH TYPE REST_API
     ADD REST_API_CONFIG
         WITH BASE_ADDRESS "https://api.weather.com"
     ADD EVENT GetForecast
@@ -526,7 +612,7 @@ DEFINE ROUTE WeatherAPI WITH TYPE REST_API
 ## REST API Server Connector
 
 ```
-DEFINE ROUTE MyAPI WITH TYPE REST_API
+DEFINE CONNECTOR MyAPI WITH TYPE REST_API
     ADD REST_API_CONFIG
         WITH ENABLE_SERVER true
         WITH SERVER_PORT 8080
@@ -546,7 +632,7 @@ request is answered `200 accepted` at once. `{session}` is a per-request id.
 ## MQTT Bridge Connector
 
 ```
-DEFINE ROUTE CloudBridge WITH TYPE MQTT_BRIDGE
+DEFINE CONNECTOR CloudBridge WITH TYPE MQTT_BRIDGE
     ADD SOURCE_CONFIG
         WITH BROKER SELF
     ADD DESTINATION_CONFIG
@@ -574,7 +660,7 @@ one ADD MAPPING is required, and MQTT_CONFIG is not accepted in place of SOURCE_
 ## Email Connector
 
 ```
-DEFINE ROUTE AlertMail WITH TYPE EMAIL
+DEFINE CONNECTOR AlertMail WITH TYPE EMAIL
     ADD SMTP_CONFIG
         WITH HOST "smtp.example.com"
         WITH PORT 587
@@ -596,7 +682,7 @@ status. There are no SERVER, FROM or TO keys.
 
 ### LLM Connector
 ```
-DEFINE ROUTE LocalLLM WITH TYPE LLM
+DEFINE CONNECTOR LocalLLM WITH TYPE LLM
     ADD LLM_CONFIG
         WITH BASE_URL "http://localhost:11434"
         WITH MODEL "llama3.2"
@@ -605,7 +691,7 @@ DEFINE ROUTE LocalLLM WITH TYPE LLM
 
 Cloud provider (PROVIDER `openai`, `anthropic`, `gemini`, or `compatible` for an OpenAI-compatible BASE_URL; default `ollama`):
 ```
-DEFINE ROUTE Claude WITH TYPE LLM
+DEFINE CONNECTOR Claude WITH TYPE LLM
     ADD LLM_CONFIG
         WITH PROVIDER "anthropic"
         WITH MODEL "claude-sonnet-4-5"
@@ -621,7 +707,7 @@ turn on cost reporting.
 IMPORTANT: SERVER_ARGUMENTS is COMMA-SEPARATED — each argument is a separate comma-delimited token.
 
 ```
-DEFINE ROUTE ToolServer WITH TYPE MCP
+DEFINE CONNECTOR ToolServer WITH TYPE MCP
     ADD MCP_CONFIG
         WITH SERVER_COMMAND "npx"
         WITH SERVER_ARGUMENTS "-y, @modelcontextprotocol/server-filesystem, /data"
@@ -633,7 +719,7 @@ To pass environment variables to the server process, add one `WITH SERVER_ENV "N
 
 ### MCP Client Connector — Docker Desktop gateway (manages all servers in a profile)
 ```
-DEFINE ROUTE DockerGateway WITH TYPE MCP
+DEFINE CONNECTOR DockerGateway WITH TYPE MCP
     ADD MCP_CONFIG
         WITH SERVER_COMMAND "docker"
         WITH SERVER_ARGUMENTS "mcp, gateway, run, --profile, default"
@@ -644,7 +730,7 @@ DEFINE ROUTE DockerGateway WITH TYPE MCP
 Runs on the host via npx. The agent can execute any shell command including docker ps,
 docker run, docker stop, etc. Requires Node.js. Auto-updates on first use each session.
 ```
-DEFINE ROUTE DesktopCommander WITH TYPE MCP
+DEFINE CONNECTOR DesktopCommander WITH TYPE MCP
     ADD MCP_CONFIG
         WITH SERVER_COMMAND "npx"
         WITH SERVER_ARGUMENTS "-y, @wonderwhy-er/desktop-commander@latest"
@@ -654,7 +740,7 @@ DEFINE ROUTE DesktopCommander WITH TYPE MCP
 ### MCP Client Connector — Docker container/image control via Docker MCP gateway
 Uses Docker Desktop's built-in `docker` catalog server. No Node.js required.
 ```
-DEFINE ROUTE DockerControl WITH TYPE MCP
+DEFINE CONNECTOR DockerControl WITH TYPE MCP
     ADD MCP_CONFIG
         WITH SERVER_COMMAND "docker"
         WITH SERVER_ARGUMENTS "mcp, gateway, run, --servers, docker"
@@ -663,7 +749,7 @@ DEFINE ROUTE DockerControl WITH TYPE MCP
 
 ### MCP Client Connector — HTTP/SSE (remote server, no SERVER_ARGUMENTS needed)
 ```
-DEFINE ROUTE RemoteMCP WITH TYPE MCP
+DEFINE CONNECTOR RemoteMCP WITH TYPE MCP
     ADD MCP_CONFIG
         WITH SERVER_URL "https://mcp.example.com/mcp"
         WITH CLIENT_NAME "CorefluxBroker"
@@ -681,18 +767,18 @@ SQLSERVER/MSSQL, MONGODB, CRATEDB, SNOWFLAKE, OPENSEARCH, FILE_STORAGE and REST_
 
 ## Managing and monitoring connectors
 
-- Deploying a connector that already exists (`broker.add_route`) updates it in place; `broker.remove_route` stops it and removes its events and mappings.
-- A `DISABLE true` line inside the `DEFINE ROUTE` block keeps the connector defined and listed but never starts it (`-disableConnector` / `-enableConnector` add and remove the line).
+- Deploying a connector that already exists (`broker.add_connector`) updates it in place; `broker.remove_connector` stops it and removes its events and mappings.
+- A `DISABLE true` line inside the `DEFINE CONNECTOR` block keeps the connector defined and listed but never starts it (`-disableConnector` / `-enableConnector` add and remove the line).
 - `$SYS/Coreflux/Routes/<name>` holds the connector's retained LoT definition; `$SYS/Coreflux/Routes/<name>/status` is published periodically (not retained) with its health and connection JSON.
 - MQTT_BRIDGE, FEDERATION, LLM, MCP, VIDEO_INPUT, AUDIO_INPUT and VIDEO_OUTPUT need a Growth or Enterprise license. On a Community broker they are refused, and a saved one is skipped at startup with a warning in the log.
 - BARCODE runs only on Windows; on other platforms the connector is skipped with a warning.
 
 ## Common Mistakes
-- **WRONG:** DEFINE MODEL (or broker.add_model) for a new Modbus/OPC/S7/device point **RIGHT:** **ADD TAG** inside **ADD MAPPING** on the OT connector; deploy full connector with **broker.add_route**
+- **WRONG:** DEFINE MODEL (or broker.add_model) for a new Modbus/OPC/S7/device point **RIGHT:** **ADD TAG** inside **ADD MAPPING** on the OT connector; deploy full connector with **broker.add_connector**
 - **WRONG:** Using **DESTINATION_TOPIC** on an OT **ADD MAPPING** as the topic where polled tag data appears **RIGHT:** Data is on **SOURCE_TOPIC** / **`<SOURCE_TOPIC>/<tagName>`** (subscribe or read those topics)
-- **WRONG:** **ADD TAG** directly under **DEFINE ROUTE** **RIGHT:** every **ADD TAG** sits inside an **ADD MAPPING** (otherwise: "Unexpected token TAG in route components")
+- **WRONG:** **ADD TAG** directly under **DEFINE CONNECTOR** **RIGHT:** every **ADD TAG** sits inside an **ADD MAPPING** (otherwise: "Unexpected token TAG in route components")
 - **WRONG:** MODBUS_SERIAL with **WITH PORT "COM3"** **RIGHT:** **WITH COM_PORT "COM3"**
-- **NEVER use ADD METADATA in connector definitions.** `ADD METADATA` blocks (WITH IMAGE, WITH DESCRIPTION, WITH DOCLINK) appear in connector *templates* returned by `broker.get_route_template` for documentation purposes only. The LOT parser does **not** support `ADD METADATA` in deployed connectors. Including it in a `DEFINE ROUTE` block will cause a parse error. Always strip `ADD METADATA` and everything under it when generating connector LoT from a template.
+- **NEVER use ADD METADATA in connector definitions.** `ADD METADATA` blocks (WITH IMAGE, WITH DESCRIPTION, WITH DOCLINK) appear in connector *templates* returned by `broker.get_connector_template` for documentation purposes only. The LOT parser does **not** support `ADD METADATA` in deployed connectors. Including it in a `DEFINE CONNECTOR` block will cause a parse error. Always strip `ADD METADATA` and everything under it when generating connector LoT from a template.
 - Missing WITH TYPE after the connector name
 - Config block type must match the connector type (e.g., SQL_CONFIG for POSTGRESQL)
 - An event with no SOURCE_TOPIC and no EVERY never runs; a scheduled (EVERY) event without DESTINATION_TOPIC fails to load

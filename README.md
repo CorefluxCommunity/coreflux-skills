@@ -6,13 +6,14 @@ GitHub Copilot, Gemini CLI and others — to write **LoT (Language of Things)** 
 
 | Skill | Use it for |
 |-------|------------|
+| `a2ui-surfaces` | Live chat UIs from broker data with render_surface: A2UI components bound to MQTT topics, limits, MCP Apps hosts |
 | `broker-operations` | Operating a broker over MQTT: commands and replies, `$SYS` topics, triage, users and permissions, projects |
 | `broker-tools` | The broker's MCP tools and the safe validate → deploy workflow |
 | `lot-actions` | Actions: triggers, variables, topic operations, control flow, Python/LLM calls |
 | `lot-agents` | `DEFINE AGENT`: LLM connectors, tool grants, delegation |
+| `lot-connectors` | Connectors: databases, OT (Modbus, S7, OPC UA, …), REST, MQTT bridges, AI |
 | `lot-models` | Models: data schemas, field types, topic bindings, storage, inheritance |
 | `lot-panels` | LoTV panels: components, bindings, events |
-| `lot-routes` | Connectors: databases, OT (Modbus, S7, OPC UA, …), REST, MQTT bridges, AI |
 | `lot-rules` | Permission rules: ALLOW/DENY, topic patterns, priorities |
 | `lot-themes` | LoTV themes: design tokens, light/dark modes, variants |
 | `lot-things` | `DEFINE THING`: templates, parameters, references |

@@ -10,9 +10,9 @@ a line, a site) under one name. A **template** describes the asset once; a **roo
 The broker expands each root into ordinary `DEFINE` declarations, its **children**, and keeps
 owning them.
 
-**You cannot deploy Things from inside the broker.** `create_lot` has no `thing` target, and
+**You cannot deploy Things from inside the broker.** `lot_write` has no `thing` target, and
 `-addThing` / `-removeThing` run only from the CLI, over MQTT or through MCP. You can read them:
-`read_lot` with target `thing` lists every Thing. Use this skill to explain a Thing, review one,
+`broker__read_lot` with target `thing` lists every Thing. Use this skill to explain a Thing, review one,
 or draft one for a person to deploy.
 
 ## CRITICAL SYNTAX
@@ -96,7 +96,7 @@ reverse. Python scripts and themes are not clauses.
 - A dotted reference that does not resolve rejects the Thing.
 - Only these sites are rewritten: `CALL ACTION`, `CALL AGENT "<ref>.<method>"`, `CALL LLM` /
   `CALL MCP`, `PUBLISH|GET MODEL`, model `FROM`, `ADD MODEL`, `STORE IN`, `FETCH FROM`,
-  `TRIGGER "<connector>" TO <data> FOR <event>`, agent `USES LLM ROUTE|CONNECTOR`, `WITH AGENTS`, tool `WITH TARGET`, and
+  `TRIGGER "<connector>" TO <data> FOR <event>`, agent `USES LLM CONNECTOR|ROUTE`, `WITH AGENTS`, tool `WITH TARGET`, and
   in panels `INVOKE ACTION`, `TRIGGER ROUTE`, `NAVIGATE TO PANEL`, `BIND … TO MODEL|QUERY`.
 - Topic strings and payloads are never rewritten. To reach a sibling instance or go upward, use
   a reference param passed by the parent.
@@ -115,7 +115,7 @@ DEFINE THING TEMPLATE SmartPump
         USES LLM CONNECTOR {{llm}}
         WITH DEFAULT_USER "{{agentUser}}"
         WITH INTERACTION_TOPIC "{{path}}/assistant"
-        ADD TOOL "read_mqtt"
+        ADD TOOL "mqtt_read"
             WITH TOPICS "{{path}}/#"
     WITH ACTION DiagnoseAlarm
     ON TOPIC "{{path}}/alarm" DO
@@ -162,8 +162,14 @@ changed. Each Thing is published retained on `$SYS/Coreflux/Things/<name>` (sour
 Children run, publish and can be called like any entity. They are read-only except through
 their Thing: an add or remove of a child is refused with
 `… is owned by THING Oven (instance Oven/inlet, clause Overheat); edit the Thing instead.`
-Never call `create_lot` (or any add/remove tool) on a name such as `Oven_inlet_Overheat`.
+Never call `broker__create_lot` (or any add/remove tool) on a name such as `Oven_inlet_Overheat`.
 Tell the user which clause to change and that the Thing must be redeployed with `-addThing`.
+
+The exception is switching a connector, agent or action off or on: `disable_connector` / `disable_agent`
+/ `disable_action` (and `enable_*`) work on a child. The broker writes the change into the owning
+root, as `DISABLE true` in a clause the root declares itself, or as a root-level
+`WITH DISABLE "p1.Assistant"` (instance names and clause, joined with `.`) for a child that comes from
+a template, so other instances are untouched. Only roots may use `WITH DISABLE`.
 
 ## Common Mistakes
 
@@ -172,5 +178,5 @@ Tell the user which clause to change and that the Thing must be redeployed with 
 - **WRONG:** trigger indented under `WITH ACTION Overheat` **RIGHT:** `ON TOPIC … DO` at the column of `WITH ACTION`
 - **WRONG:** `DEFINE ACTION` inside a Thing **RIGHT:** `WITH ACTION`
 - **WRONG:** `WITH THING inlet-1 OF TempSensor` **RIGHT:** `WITH THING inlet1 OF TempSensor`
-- **WRONG:** `create_lot` / `-addAction` on `Oven_inlet_Overheat` **RIGHT:** change the `Overheat` clause and redeploy the Thing with `-addThing`
+- **WRONG:** `broker__create_lot` / `-addAction` on `Oven_inlet_Overheat` **RIGHT:** change the `Overheat` clause and redeploy the Thing with `-addThing`
 - **WRONG:** `WITH PARAM apiKey "sk-…"` **RIGHT:** `GET SECRET "API_KEY"` in the clause body

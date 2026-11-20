@@ -100,17 +100,48 @@ DEFINE MODEL LineOrders COLLAPSED WITH TOPIC "line1/orders/summary"
 The array is read from `line1/orders/item/0`, `line1/orders/item/1`, … and stops at the first missing
 index. Declare the field ARRAY, and publish one JSON object per index.
 
-### WITH (static or computed default) — NO VALUE keyword
-Static defaults use WITH directly. Never use WITH VALUE — the parser rejects it for anything but a plain literal.
+### WITH / WITH DEFAULT (static or computed default) — NO VALUE keyword
+`WITH <value>` and `WITH DEFAULT <value>` are the same clause: the value used when a publish does not
+assign the field. Both are fully supported; `DEFAULT` is just the explicit spelling. Never use WITH VALUE —
+the parser rejects it for anything but a plain literal.
 ```
 ADD STRING "id" WITH RANDOM UUID
 ADD STRING "timestamp" WITH TIMESTAMP "ISO"
 ADD STRING "timestamp" WITH TIMESTAMP "UTC"
 ADD STRING "status" WITH "ok"
-ADD INT "count" WITH 0
+ADD INT "count" WITH DEFAULT 0
 ADD BOOL "active" WITH FALSE
-ADD DOUBLE "offset" WITH 0.0
+ADD DOUBLE "offset" WITH DEFAULT 0.0
 ```
+
+### WITH CONSTRAINT — validation
+```
+DEFINE MODEL TankReading COLLAPSED
+    ADD DOUBLE "level" WITH CONSTRAINT BETWEEN 0 AND 100
+    ADD STRING "unit" WITH "pct" WITH CONSTRAINT IN ("pct", "mm")
+    ADD STRING "tank_id" WITH CONSTRAINT MATCHES "^T[0-9]{3}$"
+```
+- A default (either spelling) may be a constant or an expression, and combines with `WITH CONSTRAINT`.
+- Atoms: `MIN`, `MAX`, `BETWEEN a AND b` (INT/DOUBLE), `IN (...)` (items of the field type),
+  `MATCHES "regex"` and `LENGTH BETWEEN a AND b` (STRING); chain with `AND`; bounds are constants.
+- Clauses after the name may come in any order, once each.
+- Once any field uses `WITH CONSTRAINT`, every other top-level field without a default must be
+  assigned in each `PUBLISH MODEL` (a value already on the topic does not count) and values are
+  strictly typed. A default alone never does this. A violation raises `ModelConstraintException` and
+  nothing is published; catch it
+  with `ON ERROR` / `TRY`.
+- A topic-triggered model reads each mapped topic on every run. No value yet (null or empty) takes the
+  field's value clause, constant or expression, on constrained and unconstrained models; with no value
+  clause the run publishes nothing and is not an error. A present value that fails `TYPE` or a constraint
+  blocks the whole publish until that topic is valid. On a validated model the topic text is strict
+  (`"3.9"`, `"NaN"` and `"1e12"` fail `INT`). An action `AS INT` of `"3.9"` raises. A passing check publishes the coerced value (`"4"` on an INT field is the number 4). Without `ON ERROR` the failure is kept on
+  `$SYS/Coreflux/Actions/<ModelName>/Error` and cleared by the next successful run.
+- A topic-driven model that has any constraint is refused at deploy when a top-level scalar has no topic,
+  no default and no other binding. The message names the field and says to add `WITH <value>` or `WITH TOPIC`.
+  A model filled only by `PUBLISH MODEL` is not this case. `PUBLISH MODEL` does not re-read `WITH TOPIC`.
+- A `DEFINE RULE … FOR PublishPayload` with `IF PAYLOAD IS TankReading` checks incoming MQTT
+  payloads against the model (see the lot-rules skill). A binding the client omits stays optional;
+  a binding key the client sends is type-checked and constraint-checked.
 
 ## Complete Example
 
@@ -142,7 +173,21 @@ Options: QOS0 (default), QOS1, QOS2
 ### FORMAT — wire format
 `WITH FORMAT PROTOBUF` (or `JSON`, the default, or `BOTH`: JSON on the topic, protobuf on
 `<topic>/protobuf`). Header clauses (FROM, COLLAPSED, KEEP, WITH TOPIC, RETAIN, QOS, FORMAT)
-may appear in any order.
+may appear in any order. The keyword is `FORMAT`, never `FORMATS`. `COLLAPSED` and `KEEP`
+stand alone (no `WITH`).
+
+A protobuf model numbers each field with `PROTO_TAG` — the `.proto` field number, not the name:
+
+```
+DEFINE MODEL ProtoTimestamp WITH FORMAT PROTOBUF
+    ADD INT "seconds" PROTO_TAG 1
+    ADD INT "nanos" PROTO_TAG 2
+```
+
+Read a field with `GET PROTO "seconds" IN PAYLOAD`. `GET PROTOBUF` is the same verb. `IN` is
+required; the source is `PAYLOAD`, `GET TOPIC "…"`, or a variable. An optional `AS` type and
+`USING MODEL "Name"` follow. A field that is not in the message is LoT NULL, not the text
+`null`. Wire types, nested messages and casts are in `docs/guides/lot/lot-protobuf.md`.
 
 ## Model Behaviors
 
@@ -256,9 +301,18 @@ DEFINE MODEL SensorLog WITH TOPIC "sensors/log"
     STORE IN "MyDB" WITH TABLE "alerts" WHEN {temperature} > 50
 ```
 
+STORE is fire-and-forget: a failed write is logged and the model carries on. Add `ON ERROR` to the
+model when a failure must be handled: the model then waits for each write, and a missing connector
+(`Route not found: MyDB`), a disabled one (`Connector 'MyDB' is disabled`) or a failing write runs
+the handler with `ERROR.MESSAGE`.
+
 ## Database Fetch (FETCH FROM)
 
-Accepted but not run yet (warning LOT4005): the model publishes without querying the route.
+Not implemented (error LOT4005): the clause parses, but validation and `-addModel`
+refuse it with an honest message that names the connector TYPE when known
+(e.g. `FETCH FROM is not implemented for TYPE POSTGRESQL`). Do not put `FETCH FROM` on a
+model until a later release runs it; use a route `ADD EVENT` query or an action that reads
+from the connector instead.
 
 ```
     FETCH FROM "MyDB" WITH TABLE "sensors" WHEN id EQUALS "sensor1" LIMIT 10

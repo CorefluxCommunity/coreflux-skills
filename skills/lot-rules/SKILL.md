@@ -15,7 +15,7 @@ DEFINE RULE <name> WITH PRIORITY <number> FOR <scope> [TO TOPIC "<pattern>"]
         DENY
 ```
 
-`TO TOPIC` is required for Publish, Subscribe, PublishSys and SubscribeSys, and is a parse
+`TO TOPIC` is required for Publish, Subscribe, PublishSys, SubscribeSys and PublishPayload, and is a parse
 error on every other scope. Rule names are unquoted (`DEFINE RULE "X"` is LOT1001).
 
 Rules control MQTT topic access. **Lower priority numbers win** — priority 100 is stronger than
@@ -37,6 +37,7 @@ priority 1000, the same way BACnet write priority and ISA-18.2 alarm priority wo
 | Publish | MQTT publish permissions |
 | SubscribeSys | Access to $SYS topics |
 | PublishSys | Publishing to $SYS topics |
+| PublishPayload | Deny-only JSON payload validation against a model (`PAYLOAD IS`) |
 | ActionManagementCreation | Creating/modifying actions |
 | ModelManagementCreation | Creating/modifying models |
 | RouteManagementCreation | Creating/modifying routes |
@@ -60,6 +61,47 @@ rule has effect only on: Publish, Subscribe, Connect, ModelManagementCreation,
 ActionManagementRun (their built-ins sit at 1000000), and PublishSys on `$SYS` topics no
 built-in covers. A user rule for SystemConfiguration, CommandCall, any `*Remove` scope,
 Route/Rule/User/Action/Agent/Thing creation, or SubscribeSys is accepted but never consulted.
+
+## PublishPayload (payload validation)
+
+```
+DEFINE MODEL Telemetry COLLAPSED
+    ADD INT "temp" WITH CONSTRAINT BETWEEN -10 AND 50
+    ADD STRING "unit" WITH DEFAULT "C"
+
+DEFINE RULE GuardTelemetry WITH PRIORITY 100 FOR PublishPayload TO TOPIC "devices/+/telemetry"
+    IF PAYLOAD IS Telemetry THEN
+        ALLOW
+    ELSE
+        DENY
+        PUBLISH TOPIC "quarantine/telemetry/" + (TOPIC POSITION 2) WITH PAYLOAD
+```
+
+- Deny-only stage after MQTT auth (an auth deny never runs payload rules). No matching rule → deliver.
+- The condition is a full rule expression: `PAYLOAD IS <Model>` combines with `USER IS`, `USER HAS`,
+  `USER IN GROUP`, `CLIENTID`, `GET JSON "<field>" IN PAYLOAD AS <TYPE>`, `NOT`, `AND`, `OR`.
+  `IF … THEN DENY … ELSE ALLOW` works too. `ALLOW` means "no objection".
+- Matching rules run in ascending priority; the first `DENY` drops the message (any DENY wins).
+- `PAYLOAD IS <Model>` only exists in `FOR PublishPayload`; using it in another rule scope, an
+  action, a model or a route is a deploy error. `PAYLOAD IS DOUBLE` is refused (use GET JSON … AS).
+- `PAYLOAD IS` checks every model strictly: one JSON object; top-level fields without a default
+  are required; INT/DOUBLE/BOOL/STRING casts are strict (`2.5` is not INT, `NaN` is not DOUBLE,
+  `1` is not BOOL); constraints then run. Broker bindings (`WITH TOPIC`, `WITH TIMESTAMP`, …) are
+  not required from the client. Extra keys are allowed.
+- A model that is not deployed denies every matching publish until it is added (warning LOT4010).
+- `TO TOPIC` is required; matching is MQTT-correct (`a/#` matches parent `a`). Filters that start
+  with `$SYS` are refused by `-addRule` and `-validateLot`.
+- MQTT 5 QoS 1/2: reason code `0x99`. MQTT 3.1.1: silent drop + success ack. QoS 0: silent drop.
+- Deny handler = the statements after `DENY`: `PUBLISH TOPIC` / `KEEP TOPIC` only (no `PUBLISH MODEL`,
+  no `CALL`, nothing after `ALLOW`). Topic and message are expressions with `PAYLOAD` (original
+  text), `TOPIC POSITION n`, `CLIENTID`, `USER`. Publisher is `AC_PublishPayloadDeny` (not bound by
+  the denied client's ACL); `$SYS` destinations are refused; a failing statement is logged and skipped.
+- LoT action / model publishes bypass the stage. Bridge `route_*` injects do **not** — a deny shows
+  on the route's status.
+- A rule that never reads the payload deploys with warning LOT4009 — use a FOR Publish rule instead.
+- Retained messages are checked at publish time only. Empty+`retain=true` clears are exempt.
+- Ops: `COREFLUX_ALLOW_RESERVED_CLIENT_IDS=true` disables reserved-id CONNECT protection — leave
+  unset/false in production.
 
 ## Conditions
 
@@ -234,7 +276,7 @@ or AllowedSystemConfiguration).
 ## Common Mistakes
 - Missing WITH PRIORITY — every rule must have a priority number
 - Missing FOR <scope> — the operation scope is required
-- TO TOPIC is required for Publish/Subscribe/PublishSys/SubscribeSys and rejected on every other scope
+- TO TOPIC is required for Publish/Subscribe/PublishSys/SubscribeSys/PublishPayload and rejected on every other scope
 - A bare ALLOW or DENY body is valid. An IF without ELSE does the opposite when the condition
   is false (IF … THEN ALLOW denies everyone else at that priority)
 - -addRule refuses a name that already exists — remove the rule first to change it

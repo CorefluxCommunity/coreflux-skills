@@ -1,6 +1,10 @@
 {
-  "brokerVersion": "2.22.10-rc.229",
+  "brokerVersion": "2.22.21-rc.327+2cc63d63",
   "skills": [
+    {
+      "name": "a2ui-surfaces",
+      "description": "Show live broker data to the user as a small UI in the chat with the render_surface tool (A2UI 1.0 components bound to MQTT topics). Load before calling render_surface, or when the user asks to see, watch, compare or chart topic values."
+    },
     {
       "name": "broker-operations",
       "description": "Operating a Coreflux broker over MQTT: the $SYS/Coreflux/Command payload and the Command/Output reply envelope, the $SYS/Coreflux topic map, route status and action trace JSON, a triage playbook, users, groups and permission flags, env vs secrets, and projects and .lotnb notebooks."
@@ -18,16 +22,16 @@
       "description": "How to write a DEFINE AGENT: the TYPE LLM connector it uses, required clauses, ADD TOOL grants scoped to topics or targets, delegation peers, CALL AGENT from actions, and how agents are added, updated and removed."
     },
     {
+      "name": "lot-connectors",
+      "description": "How to write LOT connectors (routes): database, OT (Modbus, S7, OPC UA, EtherNet/IP, ADS, Allen-Bradley, Fins), REST API, AI (LLM, MCP), MQTT bridge/cluster, Kafka/REST integrations, email, barcode, video, events, mappings, and OT TAG blocks."
+    },
+    {
       "name": "lot-models",
       "description": "How to write LOT models: data schemas, field types, MQTT topic bindings, triggers, behaviors (Default, Keep, Collapsed), storage, and inheritance."
     },
     {
       "name": "lot-panels",
       "description": "How to write LoTV panel definitions: DEFINE PANEL, ADD COMPONENT, BIND, ON events, WITH VISIBILITY, WITH INTERACT, and the mandatory workflow for deploying panels via broker.add_panel."
-    },
-    {
-      "name": "lot-routes",
-      "description": "How to write LOT connectors: database, OT (Modbus, S7, OPC UA, EtherNet/IP, ADS, Allen-Bradley, Fins), REST API, AI (LLM, MCP), MQTT bridge/cluster, Kafka/REST integrations, email, barcode, video, events, mappings, and OT TAG blocks."
     },
     {
       "name": "lot-rules",

@@ -7,8 +7,8 @@ description: "Operating a Coreflux broker over MQTT: the $SYS/Coreflux/Command p
 
 Every broker command (`-addAction`, `-listRoutes`, `-loadProject`, …) is reachable two ways:
 
-- **Over MCP** it is a registry tool of the same name in snake_case (`-listRoutes` →
-  `list_routes`); see `broker-tools`. The tool's `argument` is what follows the token.
+- **Over MCP** it is a registry tool of the same name in snake_case (`-listThings` →
+  `list_things`; route commands take connector names, `-listRoutes` → `list_connectors`); see `broker-tools`. The tool's `argument` is what follows the token.
 - **Over raw MQTT** an external client (a script, `mosquitto_pub`, an IDE plugin, another
   broker) publishes the command to `$SYS/Coreflux/Command` and reads the reply on
   `$SYS/Coreflux/Command/Output`. The rest of this skill is about that path.
@@ -120,7 +120,10 @@ All topics below are prefixed `$SYS/Coreflux/`. Periodic ones are republished ab
 **`Routes/<n>/status`**: `name`, `type`, `connection` (`Disconnected` | `Connecting` |
 `Connected` | `Reconnecting`), `health` (`Green` | `Yellow` | `Red`),
 `errors.{total, consecutive, rate}`, `messages.{total, succeeded, failed}`, `lastActivity`,
-`lastSuccess`, `lastError`, `uptime`, `connectedSince`, `timestamp`, and `warning` when degraded.
+`lastSuccess`, `lastError` (when it happened), `lastErrorMessage` (why, when the error had text),
+`uptime`, `connectedSince`, `timestamp`, and `warning` when degraded.
+`check_connector_connection` returns the same fields under `runtime`, including for types with
+no live connection probe.
 
 | Health | When |
 |--------|------|
@@ -247,9 +250,11 @@ listing every `GET ENV` / `GET SECRET` name the operator must set.
 3. `-getPendingStatus`: the action may be waiting for a model, script or connector.
 4. Check the trigger's `+` / `#` shape against the topics that really arrive.
 
-**Connector connected, data missing**
-1. `Routes/<n>/status`: `errors.consecutive` and `lastError`.
-2. `-checkRouteConnection <n>`.
+**Connector connected, data missing, or health Red**
+1. `-checkRouteConnection <n>` (`check_connector_connection`). Read `message` and
+   `runtime.lastErrorMessage` — that is the event error. Do not ask the operator to paste
+   `Routes/<n>/status`.
+2. `Routes/<n>/status` is the same JSON, if you can read the topic yourself.
 3. OT tag values arrive on `<SOURCE_TOPIC>/<tag>`, not on `DESTINATION_TOPIC`.
 4. Events fire on PUBLISH; KEEP TOPIC never triggers a connector.
 
@@ -262,8 +267,9 @@ listing every `GET ENV` / `GET SECRET` name the operator must set.
 - Wrap the command in JSON, or quote a LoT body.
 - Send `-requestUser`, or put `-requestId` anywhere but last.
 - Expect a reply from `-updateData`.
-- Send `-loadFolder` over MQTT: it is refused there, because it would read any folder on the broker
-  host. Use `-addProject` / `-loadProject`, or `--project` at startup.
+- Send `-loadFolder` with a path outside `{CFBasePath}/projects`: absolute paths, `..` escapes and
+  symlink escapes are refused. Prefer a folder under the broker projects directory, or use
+  `-addProject` / `-loadProject` / `--project` at startup.
 - Read `License/Status` or `Stats` — use `License`; there is no live `Stats` topic.
 - Wait for `Projects/<n>/download` after sending `-getProject` — it is not retained.
 - Treat `-runAction` with a topic envelope as a dry run.
