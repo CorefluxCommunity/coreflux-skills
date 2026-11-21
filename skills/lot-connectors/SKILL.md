@@ -100,7 +100,7 @@ Non-OT **ADD MAPPING** blocks (e.g. some bridge templates) may still use **WITH 
 | OPENSEARCH | OPENSEARCH_CONFIG | 9200 |
 | CRATEDB | CRATEDB_CONFIG | 5432 |
 | FILE_STORAGE | FILE_STORAGE_CONFIG | — |
-| SNOWFLAKE | SNOWFLAKE_CONFIG | — |
+| SNOWFLAKE | SNOWFLAKE_CONFIG (+ optional SNOWPIPE_CONFIG) | — |
 
 ### OT (Operational Technology) Connectors
 | Type | Config Block |

@@ -1,5 +1,5 @@
 {
-  "brokerVersion": "2.22.24-rc.332",
+  "brokerVersion": "2.22.24-rc.332+62c75c5f",
   "skills": [
     {
       "name": "a2ui-surfaces",
