@@ -800,6 +800,20 @@ short form `PAYLOAD.t.ABS`. Chaining is allowed: `{temp}.ABS.SQRT`. Prefer these
 SET "msg" WITH "Temperature: " + {temp} + "°C"
 ```
 
+### String interpolation — `${...}` (same result as `+`)
+```
+PUBLISH TOPIC "devices/${device_id}/status" WITH "online"
+SET "msg" WITH "Temperature: ${temp}°C, next ${{count} + 1}"
+```
+`"a${x}b"` is exactly `("a" + ({x}) + "b")`: same stringification as `+` (NULL becomes empty text,
+a BOOL `True`/`False`, JSON its raw text), and two numbers join (`"${a}${b}"` with 1 and 2 is `12`).
+Both styles work and can be mixed in one expression; `+` stays the default in examples. Inside
+`${...}` put one expression with no double quote: a bare name is `{name}`, anything else keeps its
+normal meaning (`${PAYLOAD}`, `${TOPIC POSITION 2}`, `${reading.temp}`). Write `\$` for a literal
+`$` (`\${` keeps `${` as text; a bare `$` needs no escape). Interpolation applies only where a string is an expression (PUBLISH/KEEP TOPIC, WITH, SET,
+GET TOPIC, IF, CALL arguments). Trigger topics, model topics, GET JSON/ENV/SECRET names, TIMESTAMP
+formats, REGEX patterns, REPLACE text, CALL PYTHON/MCP names and `SUM OF TOPIC "filter"` stay literal.
+
 ### RANDOM
 ```
 SET "id" WITH RANDOM UUID
