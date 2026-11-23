@@ -309,7 +309,7 @@ ADD MAPPING ControlSetpoint
 Read value publishes on **factory/plc1/control/setpoint**; publishing to **factory/plc1/control/setpoint/write** writes the value to the PLC.
 
 Value options on an OT **ADD TAG** (all optional): **SCALING** and **OFFSET** give `raw × SCALING + OFFSET`;
-**MIN_VALUE** / **MAX_VALUE** clamp it; **DECIMAL_PLACES** rounds it (default 2); **DEADBAND** is the minimum
+**MIN_VALUE** / **MAX_VALUE** clamp it, and clamp a written value before it reaches the device; **DECIMAL_PLACES** rounds it (default 2); **DEADBAND** is the minimum
 change before a new value is published (default 0 = every poll); **UNIT** is a label. These take a plain number;
 OFFSET, MIN_VALUE and MAX_VALUE may be negative (`WITH OFFSET -40`).
 
