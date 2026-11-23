@@ -699,7 +699,7 @@ DEFINE CONNECTOR Claude WITH TYPE LLM
         WITH MAX_TOKENS 1024
 ```
 MODEL is required. Cloud providers use their own endpoint when BASE_URL is omitted. MAX_TOKENS caps each
-completion (default 2048); SYSTEM_PROMPT applies to CALL LLM; PRICE_INPUT / PRICE_OUTPUT (per million tokens)
+completion (default 2048), a reasoning model's thinking included — an agent run cut by it ends `truncated`; SYSTEM_PROMPT applies to CALL LLM; PRICE_INPUT / PRICE_OUTPUT (per million tokens)
 turn on cost reporting.
 
 ### MCP Client Connector — stdio transport

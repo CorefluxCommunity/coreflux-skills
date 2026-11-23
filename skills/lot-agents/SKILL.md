@@ -137,6 +137,11 @@ There is no `METHOD` keyword. `execute` takes `task` (required), `session_id` an
 `queue_timeout` (seconds to wait for a busy agent, overriding `QUEUE_TIMEOUT`; 0 = do not wait);
 `clear_history` takes `session_id`. The task runs as the agent's `DEFAULT_USER`. A failure comes
 back as JSON (`{ "success": false, "status", "code", "message" }`); read it with `GET JSON`.
+`unknown_agent` means no such agent; `connector_missing` means the agent exists but its LLM
+connector is not defined or not running (the message names it).
+Status `truncated` with code `max_tokens` means the model hit the LLM connector's `MAX_TOKENS` before
+finishing (a reasoning model can spend it all on thinking): raise `MAX_TOKENS` on the connector, not
+on the agent. Code `empty_response` (status `failed`) means the model answered nothing and called no tool.
 
 ## How work arrives
 
@@ -189,7 +194,7 @@ Viewers see them according to their own agent flags (`AllowedAgentRead`, `Allowe
 - `-addAgent <DEFINE AGENT …>` adds an agent, or **updates it in place** if it exists. The new
   block is checked first; the agent keeps its conversations.
 - `-removeAgent <name>` cancels its tasks, removes it and forgets its conversations.
-- `-listAgents` lists name, LLM connector, status (`online` / `offline` / `error`) and description.
+- `-listAgents` lists name, LLM connector, status (`online` / `unreachable` / `offline` / `error`) and description.
 - Agents and connectors share one name space: an agent cannot take a connector's name.
 - An LLM connector an agent uses cannot be removed until the agent is removed or updated.
 - Agents need a Growth or Enterprise license, like `TYPE LLM`, but take no connector slot.

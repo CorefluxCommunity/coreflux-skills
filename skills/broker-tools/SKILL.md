@@ -150,7 +150,7 @@ Notes on the ones you will use most:
   replace or remove anything.
 - **list_connectors** — connectors with health (Green/Yellow/Red), events and mappings. Agents are
   not listed here.
-- **list_agents** — agents with `name`, `llmRoute`, `status` (`online` / `offline` / `error`) and
+- **list_agents** — agents with `name`, `llmRoute`, `status` (`online` / `unreachable` / `offline` / `error`) and
   `description`.
 - **check_connector_connection** — test one connector by name. The reply's `message` and
   `data.runtime` are the monitored status: `health`, `errors`, `messages`, `lastError` (when
