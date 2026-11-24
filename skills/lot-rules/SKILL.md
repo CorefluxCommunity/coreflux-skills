@@ -100,8 +100,6 @@ DEFINE RULE GuardTelemetry WITH PRIORITY 100 FOR PublishPayload TO TOPIC "device
   on the route's status.
 - A rule that never reads the payload deploys with warning LOT4009 — use a FOR Publish rule instead.
 - Retained messages are checked at publish time only. Empty+`retain=true` clears are exempt.
-- Ops: `COREFLUX_ALLOW_RESERVED_CLIENT_IDS=true` disables reserved-id CONNECT protection — leave
-  unset/false in production.
 
 ## Conditions
 
