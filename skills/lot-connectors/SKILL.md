@@ -199,6 +199,14 @@ DEFINE CONNECTOR MyDB WITH TYPE POSTGRESQL
         WITH PASSWORD GET SECRET "PG_PASSWORD"
 ```
 
+A changed ENV or SECRET reaches a running connector without a redeploy. Credential settings read on use
+(API_KEY, AUTH_SECRET, CLIENT_SECRET, REFRESH_TOKEN, BEARER_TOKEN, SERVICE_ACCOUNT, CLIENT_ASSERTION_KEY)
+refresh in place, keeping the connection. Any other setting restarts the connector, unless
+`WITH HOT_RELOAD false` is set in ADD CONNECTOR_CONFIG: then it keeps running on the old value until it
+next starts. HOT_RELOAD defaults to false for streaming and session types (GRPC, KAFKA, MQTT_BRIDGE,
+MQTT_CLUSTER, FEDERATION, SPARKPLUG_B, SPARKPLUG_HOST, OPCUA, OPCUA_SERVER, MODBUS_SERVER, VIDEO_INPUT,
+AUDIO_INPUT, VIDEO_OUTPUT, MCP) and to true for the rest.
+
 ## Events (triggered by MQTT messages)
 
 ```
