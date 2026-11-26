@@ -374,7 +374,12 @@ DEFINE CONNECTOR LogsDB WITH TYPE MONGODB
         WITH QUERY "CLEAN:{collection: logs, document: {source_topic: {source_topic}, data: {value.json}}}"
 ```
 
-A MongoDB insert QUERY must name both `collection:` and `document:`; any other QUERY is treated as a find.
+A MongoDB insert QUERY must name both `collection:` and `document:`; any other QUERY is a find:
+`CLEAN:{collection: logs, filter: {level: {payload}}, sort: {timestamp: -1}, limit: 10}` (keys `collection`, `filter`,
+`projection`, `sort`, `skip`, `limit`; anything else is refused). A find publishes a JSON array in relaxed Extended JSON
+(`{"$oid": …}`, `{"$date": …}`); a failed event publishes nothing and runs `ON ERROR`. Update, delete and aggregation are
+not supported. A login in CONNECTION_STRING must be percent-encoded; or leave it out and add `WITH USERNAME` /
+`WITH PASSWORD GET SECRET "…"`. URI options (`socketTimeoutMS`, `tls=true`, `maxPoolSize`, …) are honoured.
 
 ### File Storage
 ```
