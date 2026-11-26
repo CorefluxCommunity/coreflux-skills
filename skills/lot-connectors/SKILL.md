@@ -351,8 +351,8 @@ placed by where it stands, so a payload or topic level cannot change the query.
   comma-separated list of numbers, `true`, `false` or `null`. Anything else, a bare name such as `line_1`
   included, **refuses the event**. Quote the placeholder to store it as text.
 
-`{env.NAME}` and `{secret.NAME}` are placed as they are. MongoDB and OpenSearch JSON queries are not covered
-yet, so keep their values from untrusted publishers. Limit who may publish to SOURCE_TOPIC with a rule
+`{env.NAME}` and `{secret.NAME}` are placed as they are. MongoDB and OpenSearch JSON queries place each value as
+one JSON value (quote a placeholder that must stay text: `note: "{payload}"`). Limit who may publish to SOURCE_TOPIC with a rule
 (`lot-rules`) and give the connector's database user only the rights it needs.
 
 **Pool and write concurrency:** optional `SQL_CONFIG` keys `MAX_POOL_SIZE`, `MIN_POOL_SIZE`, `CONNECTION_IDLE_LIFETIME`, `CONNECTION_LIFETIME` wire into the driver pool; omit to keep driver defaults (`MIN_POOL_SIZE` ≤ `MAX_POOL_SIZE`). `WRITE_CONCURRENCY` (alias `MAX_CONCURRENT_WRITES`) caps in-flight MQTT-triggered SQL events; `WRITE_QUEUE_FULL_POLICY` is `block` (default unbounded back-pressure; `WRITE_QUEUE_CAPACITY` ignored), `drop_oldest`, or `drop_newest` (capacity default 1000). A bad INSERT, PostgreSQL `53300`, or pool-exhausted keeps the connector Connected; only transport failures disconnect.
@@ -380,6 +380,30 @@ A MongoDB insert QUERY must name both `collection:` and `document:`; any other Q
 (`{"$oid": …}`, `{"$date": …}`); a failed event publishes nothing and runs `ON ERROR`. Update, delete and aggregation are
 not supported. A login in CONNECTION_STRING must be percent-encoded; or leave it out and add `WITH USERNAME` /
 `WITH PASSWORD GET SECRET "…"`. URI options (`socketTimeoutMS`, `tls=true`, `maxPoolSize`, …) are honoured.
+
+### OpenSearch
+```
+DEFINE CONNECTOR Search WITH TYPE OPENSEARCH
+    ADD OPENSEARCH_CONFIG
+        WITH BASE_URL "https://opensearch.example.com:9200"
+        WITH USERNAME "coreflux"
+        WITH PASSWORD GET SECRET "OPENSEARCH_PASSWORD"
+    ADD EVENT IndexReading
+        WITH SOURCE_TOPIC "sensors/+/reading"
+        WITH QUERY "CLEAN:{index: readings, body: {sensor: {topic.2}, value: {payload.json.value}, at: {timestamp}}}"
+    ADD EVENT LatestReadings
+        WITH SOURCE_TOPIC "sensors/+/latest"
+        WITH DESTINATION_TOPIC "sensors/{topic.2}/latest/result"
+        WITH QUERY "CLEAN:{index: readings, query: {match: {sensor: {topic.2}}}, sort: [{at: {order: desc}}], size: 10}"
+```
+
+An OpenSearch QUERY with both `index:` and `body:` indexes `body` as a new document (optional `id:` replaces that
+document); any other QUERY is a search of `index` whose other keys (`query`, `sort`, `size`, `from`, `_source`) are the
+`_search` body. Never wrap a search in `body:` (it would be indexed). A search publishes the hits' `_source` as a JSON
+array; aggregation results, update, delete and bulk are not supported. Event index names turn hyphens into `_`.
+Settings: `BASE_URL` (required), `USERNAME` + `PASSWORD` (basic auth; omit both without security), `IGNORE_CERT_ERRORS` (self-signed test
+certificates only), `REQUEST_TIMEOUT` (30 s), `CONNECTION_TIMEOUT` (5 s); `USE_SSL` only picks the scheme of a
+`BASE_URL` without one. A login inside `BASE_URL` or a `USERNAME` with `:` is refused.
 
 ### File Storage
 ```
